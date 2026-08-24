@@ -40,6 +40,13 @@ plain folder deploys.
 | `lp status` | What is serving, since when, and from what |
 | `lp logs` | The app's log. `--follow`, or `--deploy <id>` for one build's output |
 | `lp rollback [id]` | Back to the previous release. Names it before it acts |
+| `lp create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead |
+| `lp redeploy` | Build again from the app's own repository. Sends nothing from your disk |
+| `lp restart` / `lp start` | Restart the app, starting it if it is stopped. `--wait` waits until it is up and fails if it never comes up |
+| `lp stop` | Stop the app |
+| `lp events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
+| `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container of their own with their own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values |
+| `lp task list\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes |
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 
@@ -90,6 +97,17 @@ lp deploy --no-watch
 `lp` detects that nothing can answer a prompt — stdin is not a terminal, or `CI`
 is set — and exits rather than hanging on a confirmation nobody can see.
 
+A whole pipeline is the same shape. Each step fails the build if it fails, so
+you do not need to check anything yourself:
+
+```bash
+lp deploy                 # ship it, and wait for the build
+lp job run migrate        # run the migration, and wait for it
+lp restart --wait         # pick up the new configuration, and wait for it
+```
+
+If a step fails, `lp events` says what the platform noticed.
+
 **Exit codes are a contract:**
 
 | | |
@@ -99,6 +117,32 @@ is set — and exits rather than hanging on a confirmation nobody can see.
 | `2` | Usage or configuration: no app linked, a bad flag, a prompt that could not be asked |
 | `3` | Not authenticated, or refused |
 | `4` | Could not reach the install |
+
+## For coding agents
+
+This repository also carries two skills — the instructions a coding agent needs
+to ship an app here without a person watching:
+
+| | |
+|---|---|
+| [`skills/launchpad-cli`](skills/launchpad-cli/SKILL.md) | signing in without a browser, the deploy loop, the exit codes, what goes in the bundle, and what `lp` deliberately does not do |
+| [`skills/launchpad-sdk`](skills/launchpad-sdk/SKILL.md) | writing the app itself: `PORT`, `HOST` and `BASE_PATH`, how the build detects a framework, `launchpad.toml`, and the app SDK for Python and Node |
+
+For Claude Code, drop them where it looks for skills:
+
+```bash
+for s in launchpad-cli launchpad-sdk; do
+    mkdir -p ~/.claude/skills/$s
+    curl -fsSL -o ~/.claude/skills/$s/SKILL.md \
+        https://raw.githubusercontent.com/gopanair/launchpad-cli/main/skills/$s/SKILL.md
+done
+```
+
+**No local runtime is required to deploy.** The install builds: it resolves and
+installs dependencies, picks the language version, and starts the app. An agent
+with this binary and a key can create an app, push a directory, read the build
+log and roll back without Node, Python or a Go toolchain on the machine it is
+working on.
 
 ## Verifying a download
 
