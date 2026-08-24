@@ -1,6 +1,6 @@
 ---
 name: launchpad-sdk
-description: Write an app that runs on Launchpad — what the platform sets in its environment, how it is detected and built, what `launchpad.toml` declares, and the Launchpad app SDK for Python and Node (`lp.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Launchpad, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
+description: Write an app that runs on Launchpad — what the platform sets in its environment, how it is detected and built, what `launchpad.toml` declares, and the Launchpad app SDK for Python, Node and Go (`lp.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Launchpad, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
 ---
 
 # Writing an app for Launchpad
@@ -107,10 +107,50 @@ import launchpad as lp        # Python
 import lp from "@launchpad/sdk";   // Node — ESM. From CommonJS: await import(...)
 ```
 
-Off-platform every call that needs the platform raises or throws, naming the
-environment variable that is missing. **There is deliberately no dry-run mode**:
-an SDK that printed to a console instead of paging a channel would be a trap
-that only springs in production.
+```go
+import lp "launchpad/lp"     // Go — no require line; the build's go.work resolves it
+```
+
+Off-platform every call that needs the platform raises, throws or returns an
+error, naming the environment variable that is missing. **There is deliberately
+no dry-run mode**: an SDK that printed to a console instead of paging a channel
+would be a trap that only springs in production.
+
+**Before the deploy, `lp sdk vendor` puts it on your disk.** The SDK is installed
+by the build, so a deployed app never needs this — but until the platform has
+built the app, your own tooling cannot see the package at all. In Python and Node
+that is a nuisance (the import raises); in Go it is a stop, because nothing
+resolves `launchpad/lp` and `go build`, `go vet` and your CI all fail on the
+import line.
+
+```
+lp sdk vendor                  # language detected from the tree
+```
+
+It writes `.launchpad/sdk-<lang>/` from the install you are signed in to, so you
+compile against the copy that install's build would have used. Nothing is
+published to a registry in any language, deliberately: a published package would
+be a second version, and you would be building against whichever your package
+manager resolved rather than against the install you deploy to.
+
+Go also gets a `go.work` naming it — **no require line is added to your
+`go.mod`**. Both paths ship with `lp deploy` and the platform then stands aside,
+because an app that brought its own SDK keeps it; ignore both in `.gitignore` or
+neither, since ignoring only `go.work` leaves a workspace on the platform naming
+a directory that did not ship. Python and Node need one install line, which the
+command prints.
+
+### Go reads a little differently, on purpose
+
+| | |
+|---|---|
+| **A context on everything that touches the network** | `lp.App.Can(ctx, "email")`, `lp.Notify.Slack(ctx, text)`, `lp.Jobs.Start(ctx, ...)`. Your handler already has one, and an SDK call should not be the thing in it that cannot be cancelled |
+| **Errors, not exceptions** | `*lp.Error` carries the status, the platform's own words and the decoded body. `errors.As` reaches `*lp.QueueFullError` (`InFlight`, `Limit`) and `*lp.VersionConflictError` (`Version`) |
+| **Options are structs** | `lp.EmailMessage{To: …, Subject: …, Text: …}`, `lp.StartOptions{Params: …}`, `lp.SlackFileOptions{Title: …}` — Go has no keyword arguments |
+| **`lp.ViewerFor(r.Header)` / `lp.Who(ctx, r.Header)`** | the first errors when there is nobody to act for; the second answers `nil, nil`, because an anonymous visitor is an answer |
+| **`lp.TaskFor(r.Header)` may be nil, and a nil one still logs** | `task.Log(ctx, …)` on a nil `*lp.Task` does nothing and says so, so an endpoint serving both a schedule and a person needs no branch |
+| **`lp.CurrentRun()`** | the job's view of itself, `nil` everywhere else |
+| **Numbers come back as `float64`** | anything read out of `lp.Data`'s map has been through JSON. Unmarshal `Document.Data` into a struct of your own when you want your types back |
 
 ### What this app is, and what it may do
 
@@ -132,11 +172,11 @@ for this app" on a screen instead of leaving it to be found at 2am in a log.
 
 | | |
 |---|---|
-| `lp.scratch_dir("uploads")` / `lp.scratchDir` | ephemeral, per app, **wiped on every start, restart and redeploy** |
-| `lp.session_scratch_dir(id)` / `lp.sessionScratchDir` | one browser session's corner of it. The id is hashed, so a traversing value cannot escape; an empty one raises |
-| `lp.storage("reports").path` | a durable volume an administrator mapped to this app, resolved by name |
-| `lp.store("reports").put(path)` | a file into an object store |
-| `lp.mounts()` | everything mapped, with `read_only` |
+| `lp.scratch_dir("uploads")` / `lp.scratchDir` / `lp.ScratchDir` | ephemeral, per app, **wiped on every start, restart and redeploy** |
+| `lp.session_scratch_dir(id)` / `lp.sessionScratchDir` / `lp.SessionScratchDir` | one browser session's corner of it. The id is hashed, so a traversing value cannot escape; an empty one is refused |
+| `lp.storage("reports").path` / `lp.Storage(…).Path` | a durable volume an administrator mapped to this app, resolved by name |
+| `lp.store("reports").put(path)` / `lp.Store(…).Put(path, name)` | a file into an object store |
+| `lp.mounts()` / `lp.Mounts()` | everything mapped, with `read_only` / `ReadOnly()` |
 
 ### The app's one document
 

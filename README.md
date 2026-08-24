@@ -49,6 +49,7 @@ plain folder deploys.
 | `lp task list\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes |
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
+| `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
 
 Every command takes `--help`.
 
@@ -93,6 +94,13 @@ export LAUNCHPAD_URL=https://launchpad.your-company.com
 export LAUNCHPAD_TOKEN=lpu_...
 lp deploy --no-watch
 ```
+
+Where the runner mounts secrets as files rather than exporting them, use
+`LAUNCHPAD_TOKEN_FILE` and give it the path — an environment variable is visible
+in `/proc`, inherited by every child process and printed by any diagnostic that
+dumps the environment, while a path is not sensitive. Setting both is refused
+rather than resolved: a job exporting two tokens does not know which one it is
+using.
 
 `lp` detects that nothing can answer a prompt — stdin is not a terminal, or `CI`
 is set — and exits rather than hanging on a confirmation nobody can see.

@@ -149,6 +149,35 @@ outside the platform, for a person holding a grant. The transfer goes **direct
 to the object store**, so an unreachable bucket is exit 4 naming that host,
 while a refusal from the install is exit 3.
 
+## The SDK before the deploy: `lp sdk vendor`
+
+The app SDK is installed by the build, so a deployed app never needs this. What
+it is for is everything before the deploy — an editor that can see the package,
+and a local `go build`, `go vet` or CI run that does not fail on the import.
+
+```
+lp sdk vendor                  # language detected from the tree
+lp sdk vendor --lang python
+```
+
+It writes `.launchpad/sdk-<lang>/` from the install you are signed in to, so the
+bytes you compile against are the ones that install's build would have used.
+Nothing is published to a registry in any language, and that is deliberate: a
+published package is a second version, and you would then be building against
+whichever one your package manager resolved.
+
+- **Go** also gets a `go.work` naming the vendored module. No require line is
+  added to your `go.mod` — a workspace resolves the import without one. Both
+  paths ship with `lp deploy` and the platform then stands aside, because an app
+  that brought its own SDK keeps it. **Ignore both in `.gitignore` or neither**:
+  ignoring only `go.work` leaves a workspace on the platform naming a directory
+  that did not ship, and the build fails there while working here.
+- **Python**: `uv pip install -e .launchpad/sdk-python`.
+- **Node**: `"@launchpad/sdk": "file:.launchpad/sdk-node"` in `package.json`.
+
+Re-run it after the install is upgraded. Delete both paths to go back to the
+platform's own copy.
+
 ## What `lp` does not do
 
 Be straight about this rather than inventing a flag:
