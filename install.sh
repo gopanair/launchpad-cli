@@ -7,8 +7,8 @@
 # SHA256SUMS, and puts it somewhere on PATH. Nothing else — no daemon, no
 # configuration, no root.
 #
-# Linux only, because Windows does not run this and no macOS build is published
-# yet. Both of those are refused by name, with somewhere to go.
+# Linux and macOS. Windows does not run this and is refused by name, with
+# somewhere to go.
 #
 # THE WHOLE BODY IS INSIDE main(), CALLED ON THE LAST LINE, for the same reason
 # the one-box installer is written that way: piping into a shell executes what
@@ -29,7 +29,7 @@ set -eu
 # uploads the release, so the default is always the version whose SHA256SUMS
 # sits beside it. Typing a version here by hand is how those two come apart.
 
-VERSION_DEFAULT=0.5.1
+VERSION_DEFAULT=0.6.0
 REPO_DEFAULT=gopanair/launchpad-cli
 BINARY=lp
 
@@ -116,18 +116,18 @@ parse_args() {
 # build matrix produces and a translation table between two spellings of the
 # same platforms is a thing to get wrong twice.
 #
-# macOS is refused by name rather than left to 404. Nothing about the client is
-# platform-specific and the matrix is one line in scripts/publish-cli.sh, so
-# this is a decision about what is published, not about what builds.
+# Windows is refused by name rather than left to 404, and names the asset to
+# fetch instead. macOS installs here like Linux: the darwin binaries are
+# unsigned, and Gatekeeper quarantines what a *browser* downloads rather than
+# what curl does, so this path works while a hand-download from the releases
+# page will need clearing.
 
 detect_platform() {
     case $(uname -s) in
     Linux) OS=linux ;;
-    Darwin)
-        die "no macOS build is published yet — Linux and Windows only. https://github.com/$REPO/releases"
-        ;;
+    Darwin) OS=darwin ;;
     MINGW* | MSYS* | CYGWIN* | Windows_NT)
-        die "this script is for Linux. On Windows, download lp_windows_amd64.exe from https://github.com/$REPO/releases and rename it lp.exe"
+        die "this script is for Linux and macOS. On Windows, download lp_windows_amd64.exe from https://github.com/$REPO/releases and rename it lp.exe"
         ;;
     *) die "unsupported operating system: $(uname -s)" ;;
     esac

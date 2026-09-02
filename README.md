@@ -11,8 +11,14 @@ One binary. No dependencies, no daemon, no root — it lands in `/usr/local/bin`
 if you can write there and `~/.local/bin` if you cannot, and the script tells
 you which.
 
-**Linux and Windows.** No macOS build is published yet; the installer says so
-rather than failing at a download.
+**Linux, macOS and Windows.** The install script covers Linux and macOS; on
+Windows it names the file to download rather than failing at one.
+
+The binaries are unsigned. On macOS that is invisible when you install with the
+script — `curl` does not mark a download the way a browser does. On Windows,
+Smart App Control may refuse `lp.exe` outright; if it does, there is no
+per-file exception to add and turning Smart App Control off is not a trade
+worth making for a CLI.
 
 **This repository holds the binaries, not the source.** Each release carries one
 build per platform plus a `SHA256SUMS` the installer checks.
@@ -47,10 +53,11 @@ plain folder deploys.
 | `lp stop` | Stop the app |
 | `lp events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
 | `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container of their own with their own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values |
-| `lp task list\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. It runs and reads them; the schedules themselves are added on the app's Automation page |
+| `lp task list\|create\|edit\|delete\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. `create` needs `--schedule` and `--path`; `edit` changes only the fields you name |
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 | `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
+| `lp api <method> <path>` | Call this install's HTTP API with the credential `lp` already holds — the way round a verb `lp` does not have, without putting the key in a shell variable. `--data` takes JSON, `@file` or `@-` |
 
 Every command takes `--help`, and every command takes `--json`.
 
@@ -75,8 +82,8 @@ it. Two things are worth knowing:
 | | |
 |---|---|
 | Linux | x86_64 and arm64 — the install script above |
+| macOS | Intel and Apple Silicon — the same install script |
 | Windows | x86_64 — download `lp_windows_amd64.exe` from [Releases](https://github.com/gopanair/launchpad-cli/releases), rename it `lp.exe`, and put it somewhere on your PATH |
-| macOS | not published yet |
 
 ### Windows
 
@@ -147,7 +154,7 @@ If a step fails, `lp events` says what the platform noticed.
 |---|---|
 | `0` | It worked |
 | `1` | The platform did the thing and it failed — a failed build, a refused bundle |
-| `2` | Usage or configuration: no app linked, a bad flag, a prompt that could not be asked, or an app an administrator has locked |
+| `2` | Usage or configuration: no app linked, a bad flag, a name that does not exist, a prompt that could not be asked, or an app an administrator has locked |
 | `3` | Not authenticated, or refused. If it says your account is a viewer, creating and deploying apps needs the publisher role — ask an administrator for it |
 | `4` | Could not reach the install |
 
@@ -159,7 +166,7 @@ to ship an app here without a person watching:
 | | |
 |---|---|
 | [`skills/launchpad-cli`](skills/launchpad-cli/SKILL.md) | signing in without a browser, the deploy loop, the exit codes, what goes in the bundle, and what `lp` deliberately does not do |
-| [`skills/launchpad-sdk`](skills/launchpad-sdk/SKILL.md) | writing the app itself: `PORT`, `HOST` and `BASE_PATH`, how the build detects a framework, `launchpad.toml`, and the app SDK for Python and Node |
+| [`skills/launchpad-sdk`](skills/launchpad-sdk/SKILL.md) | writing the app itself: `PORT`, `HOST` and `BASE_PATH`, how the build detects a framework, `launchpad.toml`, and the app SDK |
 
 For Claude Code, drop them where it looks for skills:
 

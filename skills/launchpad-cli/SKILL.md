@@ -14,20 +14,37 @@ this one binary.
 That is what makes the whole loop available to an agent: write files, `lp
 deploy`, read what the platform says, fix, deploy again.
 
+| Platform | How |
+|---|---|
+| Linux x86_64, arm64 | `install.sh` |
+| macOS Intel, Apple Silicon | `install.sh` |
+| Windows x86_64 | download `lp_windows_amd64.exe` by hand |
+
+On Linux and macOS:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
 ```
 
-That script is Linux (x86_64 and arm64). On **Windows** it refuses rather than
-downloading something that does not exist; take the binary directly and put it
-on your PATH:
+On **Windows** the script refuses rather than downloading something that does
+not exist. Take the binary directly and put it on your PATH:
 
 ```powershell
 curl.exe -fsSLo lp.exe https://github.com/gopanair/launchpad-cli/releases/latest/download/lp_windows_amd64.exe
 ```
 
-**No macOS build is published yet** — there is no asset to fetch and nothing to
-retry, so say so rather than looking for another installer.
+**The binaries are unsigned, and on Windows that can stop the install dead.**
+With Smart App Control enforcing, `lp.exe` is refused however it was obtained —
+the download is intact and matches the published checksum, and Windows blocks it
+anyway for having no signature and no reputation. There is no per-file
+exception: the only lever is switching Smart App Control off, which Windows
+cannot reverse without a reinstall. **Do not talk anybody into that.** Report
+that the install is blocked and say the fix is a signed build.
+
+On macOS the same lack of a signature is survivable, because Gatekeeper
+quarantines what a browser downloads and not what `curl` does — so the command
+above works, while a binary fetched by hand from the releases page has to be
+cleared before it will run.
 
 ## Signing in without a browser
 
@@ -134,7 +151,7 @@ Afterwards:
 
 | | |
 |---|---|
-| `lp logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform`. `--json` is one object per line |
+| `lp logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform`. `--json` is one object per line: `at`, `source`, `stream`, `line`, and on exactly one line a `marker` |
 | `lp logs --deploy <id>` | one build's log instead. `--source` and `--since` are refused with it |
 | `lp events` | what the platform noticed going wrong — the command to run after a restart that did not take |
 | `lp status --json` | the app, the serving release, and the app's URL |
@@ -219,7 +236,7 @@ A contract, and the reason a failed run can be triaged without reading the log:
 |---|---|
 | 0 | it worked |
 | 1 | the platform did the thing and it failed — a failed build, a refused scan, a failed job run |
-| 2 | usage or configuration — no app linked, a bad flag, jobs not available on this install, a confirmation nothing could answer, **or an app that is locked** |
+| 2 | usage or configuration — no app linked, a bad flag, jobs not available on this install, a confirmation nothing could answer, **an app that is locked**, or **a name that does not resolve** |
 | 3 | not authenticated, or refused — no credential, a revoked or expired key, uploads switched off, a licence limit |
 | 4 | the install did not answer |
 
@@ -228,7 +245,7 @@ A contract, and the reason a failed run can be triaged without reading the log:
 Confirmations are detected, not remembered: `lp` treats the run as unattended
 when `--yes` is passed, `CI` is set, or stdin is not a terminal — and then it
 **refuses rather than hanging** on a question nobody can answer. Pass `--yes` to
-anything that would ask (`lp create`, `lp rollback`).
+anything that would ask (`lp create`, `lp rollback`, `lp task delete`).
 
 `-q` drops the narration and keeps the answer on stdout. `--json` is on every
 command. `--no-color` (or `NO_COLOR`) for a clean log.
@@ -278,23 +295,30 @@ Two different things, and the CLI keeps them apart because the boundary is real:
   `launchpad.toml`. `lp job run <name>` waits by default and the run's outcome
   is the exit code; `--param k=v` repeats and is never parsed into a command.
   An install with no isolated backend has no jobs, and says so as exit 2.
-- **`lp task list|run|runs|logs`** — a scheduled task is an HTTP request to a
-  path your app published, in the app's own process. `lp task run <name>` fires
-  one now and waits as the job verb does, and a `skipped` firing is exit 1.
-  It takes no parameters *here*: a task's parameters belong to its schedule,
-  fixed when the task is created, because a request to a published path has
-  nowhere else to put them.
+- **`lp task list|create|edit|delete|run|runs|logs`** — a scheduled task is an
+  HTTP request to a path your app published, in the app's own process.
+  `lp task run <name>` fires one now and waits as the job verb does, and a
+  `skipped` firing is exit 1. It takes no parameters *here*: a task's parameters belong to
+  its schedule, because a request to a published path has nowhere else to put
+  them.
 
-**Neither is created by the CLI, and the two are created in different places.**
-A job is declared in `launchpad.toml` and exists once the release is built — and
-a `schedule` on a job there makes it a *scheduled job*, still a container of its
-own, not a task. A task is a row on the app, created on the app's **Automation**
-tab or by `POST /api/v1/apps/{id}/cron` with `{"name", "schedule", "path"}` and
-optionally `method` (GET or POST), `overlap` (`skip` or `allow`) and `params` (a
-JSON object); `PATCH` and `DELETE` on `/cron/{taskID}` change and remove one. A
-full personal key reaches all three, a **deploy key does not** — shaping a task
-is configuration rather than shipping. `lp task create` does not exist, and its
-refusal names the four subcommands without saying any of this.
+  `lp task create <name> --schedule "0 9 * * *" --path /digest` is the whole of
+  it; `--method`, `--overlap` and `--enabled` are optional. **`lp task edit`
+  sends only the fields you name**, so naming one leaves the rest alone.
+  `lp task delete` asks first, because a task takes its run history with it —
+  pass `--yes` where nothing can answer.
+
+**The two are created in different places, and only one of them here.** A job is
+declared in `launchpad.toml` and exists once the release is built — and a
+`schedule` on a job there makes it a *scheduled job*, still a container of its
+own, not a task. A task is a row on the app, and `lp task create` is the way to
+make one. A full personal key reaches these, a **deploy key does not** — shaping
+a task is configuration rather than shipping.
+
+**A `[tasks]` table in `launchpad.toml` does nothing.** Only `[jobs]` is read
+there. An unrecognized table is ignored rather than refused, because the file is
+shared with `[app]` and `[static]` — but the build log now says so, so check it
+rather than assuming a silent deploy means a schedule exists.
 
 ## Files: `lp store`
 
@@ -335,16 +359,45 @@ whichever one your package manager resolved.
 Re-run it after the install is upgraded. Delete both paths to go back to the
 platform's own copy.
 
+## The escape hatch: `lp api`
+
+`lp api <method> <path>` makes an authenticated call with the credential `lp`
+already holds, and prints the install's own JSON on stdout.
+
+```bash
+lp api GET /api/v1/apps
+lp api PATCH /api/v1/apps/$ID --data '{"visibility":"public"}'
+lp api POST /api/v1/apps/$ID/deployments --data @body.json
+cat body.json | lp api POST /api/v1/apps/$ID/cron --data @-
+```
+
+**Never read the credential out of the config file.** There is no command that
+prints it, and that is deliberate — its path and format are an implementation
+detail, they differ per platform, and a regex over them breaks silently the day
+the format changes. `lp api` is how you make the call without ever holding the
+key: it keeps the secret out of your shell variables, out of the process table,
+and out of whatever captured your output.
+
+Exit codes are the usual contract, so a refusal is still 2, 3 or 4 rather than
+something to parse out of the body. A path with no leading slash is read as
+relative to `/api/v1/`.
+
+**Prefer a verb where one exists.** `lp api` validates nothing but your JSON: a
+real verb checks the arguments, names the one you left out, reports failures in
+sentences, and keeps working when the route behind it changes. Reach for `lp
+api` for the rows below, not instead of `lp deploy`.
+
 ## What `lp` does not do
 
-Be straight about this rather than inventing a flag:
+Be straight about this rather than inventing a flag. Everything here is reachable
+with `lp api`, which is the point of the column on the right:
 
 | | |
 |---|---|
 | Environment variables | Not in the CLI. Set them on the app's Settings page, or `PATCH /api/v1/apps/{id}` with `env_vars`. A restart applies them; a redeploy is not required |
 | Making an app public | Not in the CLI. `visibility` on the same PATCH, or the Settings page. A newly created app is private, so an *anonymous* fetch of its URL answers `authentication required` — that is the app working, not a broken deploy, and your own key fetches it (see Looking at the app) |
 | Deleting an app | Not in the CLI |
-| Creating, editing or deleting a scheduled task | Not in the CLI — `lp task` only drives tasks that already exist. The app's Automation tab, or `POST`/`PATCH`/`DELETE` on `/api/v1/apps/{id}/cron`, with a full personal key |
+| Creating, editing or deleting a scheduled task | `lp task create\|edit\|delete`, with a full personal key |
 | A notebook's re-render schedule | Not in the CLI, and not a scheduled task — it produces a new rendered release rather than calling a path. The Automation tab, or `PUT`/`DELETE /api/v1/apps/{id}/render-schedule` |
 | An app's tags | Not in the CLI. `PUT /api/v1/apps/{id}/tags` with the ids of tags that already exist; creating the tags themselves is an administrator's |
 | Pruning old releases | Not in the CLI. `DELETE /api/v1/apps/{id}/deployments` drops every release but the serving one, and `DELETE .../deployments/{deployID}` drops one. A pruned release is no longer a rollback target |
@@ -361,7 +414,7 @@ Be straight about this rather than inventing a flag:
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
-| `lp task has no subcommand "create"` (exit 2) | tasks are not created by the CLI. The message lists the four verbs and stops there; the row above is where a task comes from |
+| a task or job name that does not resolve (exit 2) | a name, not a run — the platform attempted nothing. `lp task list` and `lp job list` name what exists. This is exit **2**, never 1: exit 1 would mean the work ran and failed |
 | `background jobs are not available` (exit 2) | this install has no isolated backend. Configuration, not a bug in the job |
 | `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 

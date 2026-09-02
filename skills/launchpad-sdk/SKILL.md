@@ -93,7 +93,15 @@ chunk prints is published to everyone who can read the page.
 ## `launchpad.toml`
 
 Optional, committed, and the better door for anything it can say. Unknown
-top-level tables are ignored, so it is safe to share with the CLI's `[app]`.
+top-level tables are ignored, so it is safe to share with the CLI's `[app]` and
+the platform's `[static]`.
+
+**Ignored is not unnoticed: the build log names every table and key nothing
+read.** Only `[jobs]` is read here — a `[tasks]` table declares no schedule, and
+a misspelled key inside a job is a limit that stayed at its default. Neither
+fails the deploy, so **check the build log rather than reading a green deploy as
+proof the thing you declared exists**. Scheduled tasks are made with
+`lp task create`, not from this file.
 
 ```toml
 [app]
