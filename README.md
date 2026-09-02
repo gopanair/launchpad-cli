@@ -47,7 +47,7 @@ plain folder deploys.
 | `lp stop` | Stop the app |
 | `lp events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
 | `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container of their own with their own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values |
-| `lp task list\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes |
+| `lp task list\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. It runs and reads them; the schedules themselves are added on the app's Automation page |
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 | `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |

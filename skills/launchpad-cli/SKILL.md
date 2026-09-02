@@ -162,6 +162,11 @@ lp deps --json | jq '.refused.findings[] | {package, version, advisory_id, sever
   gate — if there is no fixed version, the routes are dropping the package or
   asking an administrator.
 
+- When an administrator grants a waiver, or the advisory feed moves,
+  `POST /api/v1/apps/{id}/dependency-recheck` re-derives this app's findings
+  without a deploy. It resolves nothing and installs nothing — same packages,
+  same feed — so it is worth a call only when one of those two has changed.
+
 `lp deps` needs edit access to the app: an exact package-and-version list of a
 running internal tool is a target map, so a viewer cannot read it.
 
@@ -274,8 +279,22 @@ Two different things, and the CLI keeps them apart because the boundary is real:
   is the exit code; `--param k=v` repeats and is never parsed into a command.
   An install with no isolated backend has no jobs, and says so as exit 2.
 - **`lp task list|run|runs|logs`** — a scheduled task is an HTTP request to a
-  path your app published, in the app's own process. It takes no parameters, and
-  a `skipped` firing is exit 1.
+  path your app published, in the app's own process. `lp task run <name>` fires
+  one now and waits as the job verb does, and a `skipped` firing is exit 1.
+  It takes no parameters *here*: a task's parameters belong to its schedule,
+  fixed when the task is created, because a request to a published path has
+  nowhere else to put them.
+
+**Neither is created by the CLI, and the two are created in different places.**
+A job is declared in `launchpad.toml` and exists once the release is built — and
+a `schedule` on a job there makes it a *scheduled job*, still a container of its
+own, not a task. A task is a row on the app, created on the app's **Automation**
+tab or by `POST /api/v1/apps/{id}/cron` with `{"name", "schedule", "path"}` and
+optionally `method` (GET or POST), `overlap` (`skip` or `allow`) and `params` (a
+JSON object); `PATCH` and `DELETE` on `/cron/{taskID}` change and remove one. A
+full personal key reaches all three, a **deploy key does not** — shaping a task
+is configuration rather than shipping. `lp task create` does not exist, and its
+refusal names the four subcommands without saying any of this.
 
 ## Files: `lp store`
 
@@ -325,6 +344,10 @@ Be straight about this rather than inventing a flag:
 | Environment variables | Not in the CLI. Set them on the app's Settings page, or `PATCH /api/v1/apps/{id}` with `env_vars`. A restart applies them; a redeploy is not required |
 | Making an app public | Not in the CLI. `visibility` on the same PATCH, or the Settings page. A newly created app is private, so an *anonymous* fetch of its URL answers `authentication required` — that is the app working, not a broken deploy, and your own key fetches it (see Looking at the app) |
 | Deleting an app | Not in the CLI |
+| Creating, editing or deleting a scheduled task | Not in the CLI — `lp task` only drives tasks that already exist. The app's Automation tab, or `POST`/`PATCH`/`DELETE` on `/api/v1/apps/{id}/cron`, with a full personal key |
+| A notebook's re-render schedule | Not in the CLI, and not a scheduled task — it produces a new rendered release rather than calling a path. The Automation tab, or `PUT`/`DELETE /api/v1/apps/{id}/render-schedule` |
+| An app's tags | Not in the CLI. `PUT /api/v1/apps/{id}/tags` with the ids of tags that already exist; creating the tags themselves is an administrator's |
+| Pruning old releases | Not in the CLI. `DELETE /api/v1/apps/{id}/deployments` drops every release but the serving one, and `DELETE .../deployments/{deployID}` drops one. A pruned release is no longer a rollback target |
 | Grants, storage mappings, integrations | Administrator surfaces, in the UI or the API |
 
 ## When something refuses
@@ -334,10 +357,11 @@ Be straight about this rather than inventing a flag:
 | `no app is linked in this directory` | run `lp link <slug>`, or pass `--app` |
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
 | `that key can read and not write` (exit 3, `key_read_scope`) | the key was minted read-only in the browser. A scope cannot be widened — ask for a full key. Retrying, or reading first to "warm it up", changes nothing |
-| `forbidden` (exit 3, `deny_system_role`) | the account is a **viewer** on this install and publishing needs the publisher role. The install says only "forbidden" — this code is the whole diagnosis. An administrator changes a system role; there is no flag, no other command and no retry that reaches it, so stop and say who has to act |
+| `forbidden` (exit 3, `deny_system_role`) | the account is a **viewer** on this install and publishing needs the publisher role. The install says only "forbidden" — this code is the whole diagnosis. An administrator changes a system role; there is no flag, no other command and no retry that reaches it. A **personal** key can lodge the ask — an empty `POST /api/v1/me/promotion-requests`, which notifies the administrators and answers 409 if one is already pending — and then say who has to act. A deploy key cannot, and neither can a service account |
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
+| `lp task has no subcommand "create"` (exit 2) | tasks are not created by the CLI. The message lists the four verbs and stops there; the row above is where a task comes from |
 | `background jobs are not available` (exit 2) | this install has no isolated backend. Configuration, not a bug in the job |
 | `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 
