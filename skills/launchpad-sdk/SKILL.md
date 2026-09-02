@@ -16,7 +16,7 @@ can do.
 |---|---|
 | `PORT` | listen on it. Never on a port you chose |
 | `HOST` | bind it. `app.listen(port)` alone binds `0.0.0.0`, which is reachable without going through the platform |
-| `BASE_PATH` | where you are mounted, e.g. `/apps/reports`. Empty on an install that gives apps their own origin |
+| `BASE_PATH` | where you are mounted, e.g. `/apps/reports`. Always set, on every install and both origin shapes |
 
 **Links and form actions carry `BASE_PATH`; redirects must not.** The proxy
 strips the prefix before your handler sees the request and re-adds it on the way
@@ -201,8 +201,13 @@ lp.app.can("email")            # cheap and cached
 ```
 
 ```js
-await lp.app.slug();  await lp.app.can("slack");
+await lp.app.slug();  await lp.app.basePath();  await lp.app.can("slack");
 ```
+
+`base_path` / `basePath()` / `BasePath` / `app_base_path()` answers the same
+value as the `BASE_PATH` variable above, and either spelling is safe to build
+links from. It falls back to the variable when the install is older than the
+field, so it is never `""` on an app that is mounted somewhere.
 
 An administrator attaches an integration to an app; the app never holds the
 Slack token or the mail credential and never names the channel. **Ask before you
@@ -226,6 +231,9 @@ lp.data.get()                                   # dict, or None if never written
 lp.data.set({"period": period})
 lp.data.update(lambda s: s.update(runs=s.get("runs", 0) + 1))   # against a second writer
 ```
+
+Both writes hand back the document they wrote — `doc.data` is what you saved,
+not `None` — so a caller does not need a second read to see its own change.
 
 One JSON document per app, 256 KiB, no keys and no queries — it survives
 restart, redeploy and rollback. Never-written, cleared and `{}` stay tellable

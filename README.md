@@ -57,7 +57,7 @@ plain folder deploys.
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 | `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
-| `lp api <method> <path>` | Call this install's HTTP API with the credential `lp` already holds — the way round a verb `lp` does not have, without putting the key in a shell variable. `--data` takes JSON, `@file` or `@-` |
+| `lp api <method> <path>` | Call this install's HTTP API with the credential `lp` already holds — the way round a verb `lp` does not have, without putting the key in a shell variable. `--data` takes JSON, `@file` or `@-`. A path with no leading slash is read as relative to `/api/v1/`, so `lp api GET apps` and `lp api GET /api/v1/apps` are the same call |
 
 Every command takes `--help`, and every command takes `--json`.
 
@@ -93,6 +93,12 @@ curl.exe -fsSLo lp.exe https://github.com/gopanair/launchpad-cli/releases/latest
 
 Windows may warn about a program from an unknown publisher the first time you
 run it — the binaries are not code-signed yet.
+
+**If you run `lp` from Git Bash**, set `MSYS_NO_PATHCONV=1` first, or use paths
+without a leading slash. Git Bash rewrites an argument that looks like a Unix
+path into a Windows one before `lp` starts, so `lp api GET /api/v1/apps` arrives
+as `C:/Program Files/Git/api/v1/apps`. `lp` recognises that and says so, but the
+relative form — `lp api GET apps` — is never rewritten and needs nothing.
 
 ## Configuration
 
@@ -154,7 +160,7 @@ If a step fails, `lp events` says what the platform noticed.
 |---|---|
 | `0` | It worked |
 | `1` | The platform did the thing and it failed — a failed build, a refused bundle |
-| `2` | Usage or configuration: no app linked, a bad flag, a name that does not exist, a prompt that could not be asked, or an app an administrator has locked |
+| `2` | Usage or configuration: no app linked, a bad flag, a name that does not exist, a path no route on the install matches, a prompt that could not be asked, or an app an administrator has locked |
 | `3` | Not authenticated, or refused. If it says your account is a viewer, creating and deploying apps needs the publisher role — ask an administrator for it |
 | `4` | Could not reach the install |
 

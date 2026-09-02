@@ -121,6 +121,12 @@ framework detection, the dependency install and the language version are
 narrated. Add `--json` for NDJSON progress frames and one result object at the
 end, which is the shape to parse rather than the pretty output.
 
+**A successful deploy can still carry `warnings`.** They are the things the
+platform noticed and carried on past — a table in `launchpad.toml` that no
+reader names, most often — and they are absent from the object when there are
+none, and absent from an install older than the field, which means "this install
+does not report warnings" rather than "there were none".
+
 **Read `reason` before you read anything else.** A failed deploy's result object
 carries the whole failure message, a `reason` key, and the detail that goes with
 that reason — so in most cases you do not need a second command:
@@ -317,8 +323,9 @@ a task is configuration rather than shipping.
 
 **A `[tasks]` table in `launchpad.toml` does nothing.** Only `[jobs]` is read
 there. An unrecognized table is ignored rather than refused, because the file is
-shared with `[app]` and `[static]` — but the build log now says so, so check it
-rather than assuming a silent deploy means a schedule exists.
+shared with `[app]` and `[static]` — but the deploy says so: a plain `lp deploy`
+prints it, and `--json` carries a `warnings` array on the result object. You no
+longer have to read the build log to find out that something was ignored.
 
 ## Files: `lp store`
 
@@ -380,7 +387,18 @@ and out of whatever captured your output.
 
 Exit codes are the usual contract, so a refusal is still 2, 3 or 4 rather than
 something to parse out of the body. A path with no leading slash is read as
-relative to `/api/v1/`.
+relative to `/api/v1/`; one with a leading slash is sent as written, so `lp api
+GET apps` and `lp api GET /api/v1/apps` are the same call. A path that matches
+no route on the install is exit **2** with `route_not_found` — a usage problem
+either way, whether the path was mistyped or the install is older than the verb.
+
+**On Windows, prefer the relative form.** Git Bash and every other MSYS shell
+rewrite an argument that starts with a slash into a Windows path *before* `lp`
+is started, so `lp api GET /api/v1/apps` arrives as `C:/Program
+Files/Git/api/v1/apps` and reaches no route. `lp` recognises the shape and says
+so, but the shell is what did it: use `lp api GET apps`, which is never
+rewritten, or set `MSYS_NO_PATHCONV=1`. The same applies to `--path` on `lp task
+create`.
 
 **Prefer a verb where one exists.** `lp api` validates nothing but your JSON: a
 real verb checks the arguments, names the one you left out, reports failures in
