@@ -32,6 +32,14 @@ printf '%s' "$LP_KEY" | lp login --token-stdin https://launchpad.corp
 is refused, exit 2 — the flag would otherwise be dropped and you would be back
 in the device flow.
 
+**A key has a scope, and a read-scoped one cannot deploy.** The scope is fixed
+when the key is minted and cannot be widened afterwards, so a read key is
+replaced rather than changed. The key `lp login`'s device flow mints is always
+full — there is no `--scope` — so a read key can only reach you through
+`--token-stdin` or the environment, from a person who minted one in the browser.
+Every GET works, and the first write comes back exit 3 with
+`code: "key_read_scope"`. Ask for a full key; there is nothing to retry.
+
 There is no `--token` flag: a credential passed that way lands in shell history
 and in every `ps` on the machine. The two other doors are environment variables:
 
@@ -314,6 +322,7 @@ Be straight about this rather than inventing a flag:
 |---|---|
 | `no app is linked in this directory` | run `lp link <slug>`, or pass `--app` |
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
+| `that key can read and not write` (exit 3, `key_read_scope`) | the key was minted read-only in the browser. A scope cannot be widened — ask for a full key. Retrying, or reading first to "warm it up", changes nothing |
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |

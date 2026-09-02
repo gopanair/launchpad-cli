@@ -112,6 +112,14 @@ export LAUNCHPAD_TOKEN=lpu_...
 lp deploy --no-watch
 ```
 
+**Give that key full access, not read-only.** A key's scope is chosen when it is
+minted and cannot be widened afterwards — a read-only one is replaced, not
+changed. It will fetch status and logs quite happily and then fail every deploy
+with exit 3, which in a pipeline log looks like a permissions problem with the
+account rather than a choice somebody made on the keys page. Signing in with
+`lp login` always creates a full key, so this only bites a key pasted in from
+the browser.
+
 Where the runner mounts secrets as files rather than exporting them, use
 `LAUNCHPAD_TOKEN_FILE` and give it the path — an environment variable is visible
 in `/proc`, inherited by every child process and printed by any diagnostic that
