@@ -148,7 +148,7 @@ If a step fails, `lp events` says what the platform noticed.
 | `0` | It worked |
 | `1` | The platform did the thing and it failed — a failed build, a refused bundle |
 | `2` | Usage or configuration: no app linked, a bad flag, a prompt that could not be asked, or an app an administrator has locked |
-| `3` | Not authenticated, or refused |
+| `3` | Not authenticated, or refused. If it says your account is a viewer, creating and deploying apps needs the publisher role — ask an administrator for it |
 | `4` | Could not reach the install |
 
 ## For coding agents

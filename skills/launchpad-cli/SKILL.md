@@ -18,6 +18,17 @@ deploy`, read what the platform says, fix, deploy again.
 curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
 ```
 
+That script is Linux (x86_64 and arm64). On **Windows** it refuses rather than
+downloading something that does not exist; take the binary directly and put it
+on your PATH:
+
+```powershell
+curl.exe -fsSLo lp.exe https://github.com/gopanair/launchpad-cli/releases/latest/download/lp_windows_amd64.exe
+```
+
+**No macOS build is published yet** — there is no asset to fetch and nothing to
+retry, so say so rather than looking for another installer.
+
 ## Signing in without a browser
 
 `lp login <url>` on its own opens a device flow and waits for a human. That is
@@ -323,6 +334,7 @@ Be straight about this rather than inventing a flag:
 | `no app is linked in this directory` | run `lp link <slug>`, or pass `--app` |
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
 | `that key can read and not write` (exit 3, `key_read_scope`) | the key was minted read-only in the browser. A scope cannot be widened — ask for a full key. Retrying, or reading first to "warm it up", changes nothing |
+| `forbidden` (exit 3, `deny_system_role`) | the account is a **viewer** on this install and publishing needs the publisher role. The install says only "forbidden" — this code is the whole diagnosis. An administrator changes a system role; there is no flag, no other command and no retry that reaches it, so stop and say who has to act |
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
