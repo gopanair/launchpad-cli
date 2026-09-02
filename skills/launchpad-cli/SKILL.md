@@ -7,8 +7,9 @@ description: Deploy an app to a Launchpad install with `lp`, the command-line cl
 
 `lp` pushes a directory to a Launchpad install, which builds it and serves it.
 **The build happens on the install, not here.** You do not need `npm`, `node`,
-`pip`, `uv`, a virtualenv or a Go toolchain on this machine to ship a Node,
-Python, Go or static app — you need the source on disk and this one binary.
+`pip`, `uv`, a virtualenv, a Go toolchain or an R installation on this machine
+to ship a Node, Python, Go, R or static app — you need the source on disk and
+this one binary.
 
 That is what makes the whole loop available to an agent: write files, `lp
 deploy`, read what the platform says, fix, deploy again.
@@ -57,6 +58,7 @@ lp deploy                       # push what is on disk now
 lp status                       # what is serving, since when, from what
 lp logs --follow                # what the app said
 lp events                       # what the platform noticed
+lp deps                         # what the dependency policy says about it
 lp rollback --yes               # back to the previous release
 ```
 
@@ -83,14 +85,107 @@ framework detection, the dependency install and the language version are
 narrated. Add `--json` for NDJSON progress frames and one result object at the
 end, which is the shape to parse rather than the pretty output.
 
+**Read `reason` before you read anything else.** A failed deploy's result object
+carries the whole failure message, a `reason` key, and the detail that goes with
+that reason — so in most cases you do not need a second command:
+
+```json
+{"deployment_id":"…","app":"my-app","status":"failed","phase":"scan","step":"scan",
+ "reason":"dependency_blocked","message":"REFUSED: …","dependencies":{"…":"…"}}
+```
+
+| `reason` | What it means, and what to do |
+|---|---|
+| `build_failed` | The build or dependency install failed. `log_tail` is in the object; `lp logs --deploy <id>` has the rest |
+| `start_failed` · `not_ready` | It **built** and then would not answer. The build log ends in "Ready." and tells you nothing — read `lp logs`, the app's own output |
+| `dependency_blocked` | This install's dependency policy refused named packages. The findings are in the object under `dependencies`, and `lp deps` is the same answer. **Not a bug in your code** |
+| `source_blocked` | The install refuses that repository, URL or branch. Not fixable by pushing; ask an administrator |
+| `unsupported_framework` | Nothing in the tree the platform knows how to serve |
+| `manifest_invalid` | `launchpad.toml` was read and rejected. A one-file fix, and the message says which |
+| `runtime_version` | The language version you declared is not available on this install |
+| `source_unavailable` | The clone, the credential, or a pruned rollback target — the code could not be fetched |
+| `internal_error` | The platform, not your app. Retry, then tell somebody |
+
+A `reason` you do not recognise means the install is newer than your `lp`; treat
+it as `build_failed` and read the build log. An **absent** `reason` means the
+install is older than the field — it is not a category, so fall back to `phase`
+and `step`.
+
 Afterwards:
 
 | | |
 |---|---|
-| `lp logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform` |
+| `lp logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform`. `--json` is one object per line |
 | `lp logs --deploy <id>` | one build's log instead. `--source` and `--since` are refused with it |
 | `lp events` | what the platform noticed going wrong — the command to run after a restart that did not take |
 | `lp status --json` | the app, the serving release, and the app's URL |
+| `lp deps --json` | the packages, the advisories, and the versions that fix a refused deploy |
+
+## When the dependency policy refuses a deploy
+
+Some installs will not deploy packages with known advisories. That is an
+administrator's decision about the whole install, not a judgement about your
+code, and **it is the one failure with a structured answer waiting for you**:
+
+```sh
+lp deps --json | jq '.refused.findings[] | {package, version, advisory_id, severity, fixed_in, path}'
+```
+
+- `fixed_in` is the version to move to. When it is empty, no fix has been
+  published and upgrading is not the route.
+- `path` is the chain — `my-app > webpack > lodash`. When a finding is not
+  `direct`, upgrading the package it names is not something your manifest can
+  do; the chain says which of *your* dependencies to bump instead.
+- `mode` and `enforcing` say whether this install is actually blocking. In
+  `warn` mode findings are recorded and nothing is refused.
+- A waiver is per advisory, expires, and only an administrator can grant one.
+  There is no permanent waiver and nothing you can do from here to bypass the
+  gate — if there is no fixed version, the routes are dropping the package or
+  asking an administrator.
+
+`lp deps` needs edit access to the app: an exact package-and-version list of a
+running internal tool is a target map, so a viewer cannot read it.
+
+## Looking at the app
+
+`lp status --json` carries `url`, and it is the install's own answer rather than
+its address with a path stuck on the end — so it is right whether or not that
+install serves deployed apps on a second origin.
+
+A new app is private, and private means the same thing to a script as to a
+browser: an anonymous GET answers `authentication required`. **Your own key is
+the way in.** The apps gateway takes it as a bearer credential and then
+authorizes you exactly as it would in a browser:
+
+```sh
+URL=$(lp status --json | jq -r .url)
+curl -fsS -H "Authorization: Bearer $LAUNCHPAD_TOKEN" "$URL/"
+```
+
+The gateway consumes the key and strips it: the app process never sees it, and
+never learns which credential the request arrived on. An app key (`lp_…`) works
+the same way for the one app it grants.
+
+**In a headless browser** — for a screenshot, or a page that only exists after
+its JavaScript has run — send the same header on every request the page makes:
+
+```js
+// Playwright
+const ctx = await browser.newContext({
+  extraHTTPHeaders: { Authorization: `Bearer ${process.env.LAUNCHPAD_TOKEN}` },
+});
+// Puppeteer:  await page.setExtraHTTPHeaders({ Authorization: ... })
+// CDP direct: Network.setExtraHTTPHeaders
+```
+
+It has to reach the subresources and not just the document, or the CSS and the
+scripts come back refused and the app renders as broken rather than as private
+— which is why the header goes on the context or the page, not on one
+navigation. The same breadth is the one thing to be careful with: these APIs add
+the header to *every* host the page touches, so a page that pulls a font or a
+script from somewhere else would send your key there too. If the app is not
+self-contained, scope it with a request interceptor.
+
 
 ## Exit codes
 
@@ -100,7 +195,7 @@ A contract, and the reason a failed run can be triaged without reading the log:
 |---|---|
 | 0 | it worked |
 | 1 | the platform did the thing and it failed — a failed build, a refused scan, a failed job run |
-| 2 | usage or configuration — no app linked, a bad flag, jobs not available on this install, a confirmation nothing could answer |
+| 2 | usage or configuration — no app linked, a bad flag, jobs not available on this install, a confirmation nothing could answer, **or an app that is locked** |
 | 3 | not authenticated, or refused — no credential, a revoked or expired key, uploads switched off, a licence limit |
 | 4 | the install did not answer |
 
@@ -114,6 +209,19 @@ anything that would ask (`lp create`, `lp rollback`).
 `-q` drops the narration and keeps the answer on stdout. `--json` is on every
 command. `--no-color` (or `NO_COLOR`) for a clean log.
 
+**A refusal is JSON too.** Under `--json` anything that exits non-zero without
+having already written a result object writes one instead of leaving you to parse
+English off stderr:
+
+```json
+{"error":"that key has expired","kind":"auth","code":"key_expired","exit":3}
+```
+
+`kind` is the client's classification — `usage`, `auth`, `unreachable`, `locked`,
+`failed` — and `code` is the install's own, present only when it sent one. The
+sentence still goes to stderr as well. A **failed deploy is the exception**: its
+result object already said everything, so there is no second document.
+
 ## What goes in the bundle
 
 `.gitignore` decides — every one in the tree, `!` negations honoured — and git
@@ -125,6 +233,14 @@ to it. Always dropped: `.git/`, `.hg/`, `.svn/`, `node_modules/`, `venv/`,
 
 So: do not install dependencies before deploying. They would not travel, and the
 install resolves them itself.
+
+**R is the one where that costs real megabytes.** A local `renv::restore()`
+fills `renv/library/` with the whole dependency tree, and nothing above drops it
+by default — an R tree has no `package.json`, so the `dist/`-style rules do not
+apply. Ignore `renv/library/` and `renv/staging/` (the usual R `.gitignore`
+does) and ship `renv.lock` alone; the install restores from the lockfile against
+its own binary repository, and a library built on your machine would be compiled
+against your distribution rather than the install's.
 
 A bundled `.env`, `*.pem`, `id_rsa*` or `*.key` gets one dimmed warning and is
 not refused — do not put secrets in the tree.
@@ -174,6 +290,9 @@ whichever one your package manager resolved.
   that did not ship, and the build fails there while working here.
 - **Python**: `uv pip install -e .launchpad/sdk-python`.
 - **Node**: `"@launchpad/sdk": "file:.launchpad/sdk-node"` in `package.json`.
+- **R**: `renv::install(".launchpad/sdk-r")`, or nothing at all — the build
+  installs `launchpad` into the release's library either way, and unlike Go
+  there is no compile step here to fail without it.
 
 Re-run it after the install is upgraded. Delete both paths to go back to the
 platform's own copy.
@@ -185,7 +304,7 @@ Be straight about this rather than inventing a flag:
 | | |
 |---|---|
 | Environment variables | Not in the CLI. Set them on the app's Settings page, or `PATCH /api/v1/apps/{id}` with `env_vars`. A restart applies them; a redeploy is not required |
-| Making an app public | Not in the CLI. `visibility` on the same PATCH, or the Settings page. A newly created app is private, so an anonymous fetch of its URL answers `authentication required` — that is the app working, not a broken deploy |
+| Making an app public | Not in the CLI. `visibility` on the same PATCH, or the Settings page. A newly created app is private, so an *anonymous* fetch of its URL answers `authentication required` — that is the app working, not a broken deploy, and your own key fetches it (see Looking at the app) |
 | Deleting an app | Not in the CLI |
 | Grants, storage mappings, integrations | Administrator surfaces, in the UI or the API |
 
@@ -196,8 +315,9 @@ Be straight about this rather than inventing a flag:
 | `no app is linked in this directory` | run `lp link <slug>`, or pass `--app` |
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
-| the deploy failed during `scan` | the dependency gate, or the archive's caps — the phase and step are named, and `lp logs --deploy <id>` has the rest |
+| the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
+| an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
 | `background jobs are not available` (exit 2) | this install has no isolated backend. Configuration, not a bug in the job |
-| `authentication required` from the app's URL | the app is private. See the table above |
+| `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 
 Everything takes `--help`.

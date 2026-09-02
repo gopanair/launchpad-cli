@@ -38,6 +38,7 @@ plain folder deploys.
 | `lp link <app>` | Record which app this directory deploys to. `--local` keeps it out of git |
 | `lp deploy [dir]` | Bundle and upload. `--logs` tails the app afterwards, `--json` for scripts |
 | `lp status` | What is serving, since when, and from what |
+| `lp deps` | What the dependency policy says about the app. If a deploy was refused, this is the packages, the advisories and the versions that fix it |
 | `lp logs` | The app's log. `--follow`, or `--deploy <id>` for one build's output |
 | `lp rollback [id]` | Back to the previous release. Names it before it acts |
 | `lp create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead |
@@ -51,7 +52,23 @@ plain folder deploys.
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 | `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
 
-Every command takes `--help`.
+Every command takes `--help`, and every command takes `--json`.
+
+## Reading the output from a script
+
+`--json` puts the answer on standard output and leaves the running commentary on
+standard error, so `lp status --json | jq -r .url` works without thinking about
+it. Two things are worth knowing:
+
+- **A failed deploy tells you what to do about it.** The result object carries
+  `reason` — a short key like `build_failed`, `start_failed` or
+  `dependency_blocked` — the whole failure message, and the detail that goes with
+  it: the tail of the build log, or, when the dependency policy refused it, the
+  packages and the versions that fix them.
+- **A refusal is JSON too.** An expired key, a missing app, an install that did
+  not answer: under `--json` each writes one object with the message, the exit
+  code and what kind of problem it was. You still get the sentence on standard
+  error.
 
 ## Platforms
 
@@ -122,7 +139,7 @@ If a step fails, `lp events` says what the platform noticed.
 |---|---|
 | `0` | It worked |
 | `1` | The platform did the thing and it failed — a failed build, a refused bundle |
-| `2` | Usage or configuration: no app linked, a bad flag, a prompt that could not be asked |
+| `2` | Usage or configuration: no app linked, a bad flag, a prompt that could not be asked, or an app an administrator has locked |
 | `3` | Not authenticated, or refused |
 | `4` | Could not reach the install |
 
@@ -168,6 +185,30 @@ The installer does this for you.
 against a newer install is the normal case rather than a problem: `lp` says so
 in one dimmed line, renders anything it does not recognise by name, and carries
 on. It is never refused for being old.
+
+## Upgrading
+
+Re-run the installer. It downloads the newest published release, checks it
+against `SHA256SUMS`, and renames the new binary over the old one — so it is
+also how you upgrade a `lp` that is running.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+```
+
+`lp --version` says which one you have. To install a particular release, or to
+go back to one, pass the version through to the script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh -s -- --version 0.1.0
+```
+
+`--version latest` follows the newest release rather than the one the script was
+published with; `--dir` puts it somewhere else. Nothing else is kept anywhere —
+`~/.config/launchpad` is untouched by an upgrade, so you stay signed in.
+
+On **Windows**, download `lp_windows_amd64.exe` again and replace your `lp.exe`
+with it. Nothing else changes.
 
 ## Uninstalling
 

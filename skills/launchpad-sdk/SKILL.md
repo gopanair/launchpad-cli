@@ -1,6 +1,6 @@
 ---
 name: launchpad-sdk
-description: Write an app that runs on Launchpad — what the platform sets in its environment, how it is detected and built, what `launchpad.toml` declares, and the Launchpad app SDK for Python, Node and Go (`lp.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Launchpad, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
+description: Write an app that runs on Launchpad — what the platform sets in its environment, how it is detected and built, what `launchpad.toml` declares, and the Launchpad app SDK for Python, Node, Go and R (`lp.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Launchpad, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
 ---
 
 # Writing an app for Launchpad
@@ -36,6 +36,9 @@ Detected from the tree, in this order:
 |---|---|
 | **Next.js** | `next.config.*` or `next` in `package.json`. A `build` script is required; do **not** set `basePath` or `output` |
 | **Node** | any `package.json` with a `start` script. A `build` script runs first if present |
+| **Shiny** | `app.R`, or `ui.R` **and** `server.R` together. An `.Rmd` declaring `runtime: shiny` is a Shiny app, not a document |
+| **plumber** | `plumber.R`, or an `.R` file carrying `#*` annotations |
+| **R Markdown / Quarto** | one `.Rmd` or `.qmd` at the root, rendered once at build time and served as files |
 | **Flask / FastAPI / Streamlit** | `flask` / `fastapi` / `streamlit` in `requirements.txt` |
 | **Generic Python** | `requirements.txt` with no framework recognised |
 | **Go** | `go.mod` plus a `main` package — module root, else the first `cmd/*`. Built into one binary |
@@ -60,6 +63,32 @@ Traps worth knowing before you hit them:
 - The language version is **discovered on the install, never approximated**. A
   pin naming a patch version is refused rather than truncated; declare it once
   in the file the language already uses (`go.mod` for Go).
+
+R has four of its own, and the first is the one that costs a deploy:
+
+- **Commit `renv.lock`.** Without one the build installs nothing, says so, and
+  the app fails at its first `library()` call. `renv::init()` then
+  `renv::snapshot()`.
+- **Packages arrive as binaries, and there is no compiler.** The install points
+  renv at a binary repository, so a package with no build for that
+  distribution fails rather than spending twenty minutes in `gcc`. Prefer a
+  small lockfile: it is restored on every single deploy.
+- **One document at the root.** Two `.Rmd` files is ambiguous and the deploy
+  refuses, naming both. Keep helper scripts in a subdirectory — a root `.R` is
+  scanned for plumber annotations, so a stray one can decide the whole
+  repository's framework.
+- **Do not bind a port or build a URL.** The platform starts Shiny and plumber
+  by evaluating `runApp` / `pr_run` with the host and port it chose; nothing in
+  your repository should read `PORT`. Shiny's assets and its WebSocket inherit
+  the mount path on their own, and plumber's routes are mounted at the root —
+  annotate `#* @get /summary`, never `/apps/{slug}/summary`.
+
+Two more that are about behaviour rather than the build. **Shiny and plumber are
+one R process**, single-threaded: a reactive that takes four seconds is a
+four-second queue for every viewer at once, so slow work belongs in a job the
+page polls for. And **a document is rendered once, at build time** — there is no
+R behind the page, a re-render is a deploy rather than a restart, and whatever a
+chunk prints is published to everyone who can read the page.
 
 ## `launchpad.toml`
 
@@ -109,6 +138,10 @@ import lp from "@launchpad/sdk";   // Node — ESM. From CommonJS: await import(
 
 ```go
 import lp "launchpad/lp"     // Go — no require line; the build's go.work resolves it
+```
+
+```r
+library(launchpad)           # R — installed into the release's renv library
 ```
 
 Off-platform every call that needs the platform raises, throws or returns an
@@ -255,6 +288,15 @@ never answers is recorded as a failure with nothing else in it.
 ## Once it is deployed
 
 `lp logs` is what your app printed, `lp events` is what the platform noticed,
-and `lp status` says what is serving. A newly created app is private — an
-anonymous request to its URL answering `authentication required` is the app
-working, not a failed deploy.
+and `lp status` says what is serving — `--json` carries the app's URL, which is
+the install's own answer and so is right whether or not deployed apps get an
+origin of their own there.
+
+A newly created app is private — an *anonymous* request to its URL answering
+`authentication required` is the app working, not a failed deploy. You can still
+look at it: the apps gateway takes your own key as a bearer credential and
+authorizes you exactly as it would in a browser, so `curl -H "Authorization:
+Bearer $LAUNCHPAD_TOKEN"` and a headless browser sending the same header both
+reach an app nobody has made public. The `launchpad-cli` skill has the whole
+recipe, the browser half included. Your app never sees that header: the gateway
+consumes it.
