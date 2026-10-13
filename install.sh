@@ -29,7 +29,7 @@ set -eu
 # uploads the release, so the default is always the version whose SHA256SUMS
 # sits beside it. Typing a version here by hand is how those two come apart.
 
-VERSION_DEFAULT=0.6.3
+VERSION_DEFAULT=0.6.4
 REPO_DEFAULT=gopanair/launchpad-cli
 BINARY=lp
 

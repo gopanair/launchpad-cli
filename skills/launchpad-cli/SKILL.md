@@ -118,7 +118,9 @@ lp rollback --yes               # back to the previous release
 `lp deploy` prints the phases live — upload, scan, deploy — and exits non-zero
 if the build fails. `--logs` interleaves the build log, which is where the
 framework detection, the dependency install and the language version are
-narrated. Add `--json` for NDJSON progress frames and one result object at the
+narrated. **`--json` is NDJSON everywhere — one document per line, not one per
+command** — so read it a line at a time; a parser expecting a single document
+stops at the second. Add `--json` for NDJSON progress frames and one result object at the
 end, which is the shape to parse rather than the pretty output.
 
 **A successful deploy can still carry `warnings`.** They are the things the
@@ -299,17 +301,29 @@ Two different things, and the CLI keeps them apart because the boundary is real:
 - **`lp job list|run|runs|logs|cancel`** — a job runs in a container of its own,
   with its own memory limit and deadline, from the same release. Declare one in
   `launchpad.toml`. `lp job run <name>` waits by default and the run's outcome
-  is the exit code; `--param k=v` repeats and is never parsed into a command.
-  An install with no isolated backend has no jobs, and says so as exit 2.
+  is the exit code — **`--json` included**, where a failed run prints the run
+  document *and then* the refusal, two lines, exit 1; `--param k=v` repeats and
+  is never parsed into a command. `--for 2026-10-06T03:00:00+01:00` names the
+  instant the run is for (a date or date-time with no offset is UTC); the run
+  reads it as `LAUNCHPAD_SCHEDULED_FOR`. A job runs in a container where the
+  install has a cluster and on the install's own machine where it does not;
+  `lp job runs` says which, and the instant a run was for. `lp job list` prints
+  each job's schedule with its zone and any `expect_within` alert window. An install with no isolated backend has no
+  jobs, and says so as exit 2.
 - **`lp task list|create|edit|delete|run|runs|logs`** — a scheduled task is an
   HTTP request to a path your app published, in the app's own process.
   `lp task run <name>` fires one now and waits as the job verb does, and a
-  `skipped` firing is exit 1. It takes no parameters *here*: a task's parameters belong to
+  `skipped` firing is exit 1 — a firing that did not happen is not a success,
+  under `--json` as well. It takes no parameters *here*: a task's parameters belong to
   its schedule, because a request to a published path has nowhere else to put
   them.
 
   `lp task create <name> --schedule "0 9 * * *" --path /digest` is the whole of
-  it; `--method`, `--overlap` and `--enabled` are optional. **`lp task edit`
+  it; add `--timezone Europe/London` to read the schedule in a zone rather than
+  UTC (it then fires once per wall-clock time through daylight saving changes); `--schedule`, `--method`, `--overlap` and `--enabled` are optional.
+  **Without a schedule the task is on demand** — nothing fires it until
+  `lp task run`, the Run button or the app asks for it — and `--schedule ""` on
+  an edit takes a schedule away without touching the task or its history. **`lp task edit`
   sends only the fields you name**, so naming one leaves the rest alone.
   `lp task delete` asks first, because a task takes its run history with it —
   pass `--yes` where nothing can answer.
@@ -334,6 +348,22 @@ outside the platform, for a person holding a grant. The transfer goes **direct
 to the object store**, so an unreachable bucket is exit 4 naming that host,
 while a refusal from the install is exit 3.
 
+**`ls` shows folders and takes one.** A bare `lp store ls` lists what you hold:
+a store granted outright by its name alone, and a store granted one folder of as
+`reports/2026-08/`. That is the same spelling `ls` takes as an argument, so the
+line one command prints is the line the next one takes.
+
+```
+lp store ls                    # what you can reach, and at what level
+lp store ls reports            # one level: its folders, then its objects
+lp store ls reports/2026-08    # the level below
+```
+
+Listing a level prints folders before objects, which is what makes an object
+filed under a generated name reachable with `lp` alone — you do not have to know
+the name to find it. There is no recursive listing: a folder is a delimiter, and
+the store's extent is not something a client may address around.
+
 ## The SDK before the deploy: `lp sdk vendor`
 
 The app SDK is installed by the build, so a deployed app never needs this. What
@@ -346,7 +376,14 @@ lp sdk vendor --lang python
 ```
 
 It writes `.launchpad/sdk-<lang>/` from the install you are signed in to, so the
-bytes you compile against are the ones that install's build would have used.
+bytes you compile against are the ones that install's build would have used, and
+it prints a **build id** for the copy it wrote — twelve hex characters derived
+from the SDK's own bytes rather than a declared version. The deploy log names
+the copy your app was actually built with, and the two should match. On an
+isolated install they can differ: the copy you vendored came from the platform
+and the copy the build used came from the runner image, which is how a fix can
+ship, be vendored, and still not be in the deployed app. A mismatch is a warning
+in the build log naming both, never a failed deploy.
 Nothing is published to a registry in any language, and that is deliberate: a
 published package is a second version, and you would then be building against
 whichever one your package manager resolved.
@@ -385,8 +422,13 @@ the format changes. `lp api` is how you make the call without ever holding the
 key: it keeps the secret out of your shell variables, out of the process table,
 and out of whatever captured your output.
 
-Exit codes are the usual contract, so a refusal is still 2, 3 or 4 rather than
-something to parse out of the body. A path with no leading slash is read as
+Exit codes are the usual contract and are **coarser than the HTTP status**: 2 for
+a path that matches no route, 3 for a credential or permission refusal, 4 when
+the install could not be reached, and 1 for everything else the install refused —
+a 400 or a 422 included, where it understood the request and said no. Branch on
+the body for those; it is the platform's own JSON, and an exit code shared with
+every other command cannot tell "your request was wrong" from "the platform tried
+and failed". A path with no leading slash is read as
 relative to `/api/v1/`; one with a leading slash is sent as written, so `lp api
 GET apps` and `lp api GET /api/v1/apps` are the same call. A path that matches
 no route on the install is exit **2** with `route_not_found` — a usage problem
@@ -420,6 +462,7 @@ with `lp api`, which is the point of the column on the right:
 | An app's tags | Not in the CLI. `PUT /api/v1/apps/{id}/tags` with the ids of tags that already exist; creating the tags themselves is an administrator's |
 | Pruning old releases | Not in the CLI. `DELETE /api/v1/apps/{id}/deployments` drops every release but the serving one, and `DELETE .../deployments/{deployID}` drops one. A pruned release is no longer a rollback target |
 | Grants, storage mappings, integrations | Administrator surfaces, in the UI or the API |
+| Publishing from RStudio | Not `lp`'s: RStudio's *Add account* takes the install's address as a Posit Connect server, signs in through the same approval page as `lp login`, and publishes with rsconnect. Its routes are under `/__api__`; an agent deploys with `lp` |
 
 ## When something refuses
 

@@ -52,8 +52,8 @@ plain folder deploys.
 | `lp restart` / `lp start` | Restart the app, starting it if it is stopped. `--wait` waits until it is up and fails if it never comes up |
 | `lp stop` | Stop the app |
 | `lp events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
-| `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container of their own with their own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values |
-| `lp task list\|create\|edit\|delete\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. `create` needs `--schedule` and `--path`; `edit` changes only the fields you name |
+| `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container of their own with their own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values, `--for <time>` to name the instant the run is for |
+| `lp task list\|create\|edit\|delete\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. `create` needs `--path`, and `--schedule` (with `--timezone` for a zone other than UTC) only if you want the platform to call it on a timetable; `edit` changes only the fields you name |
 | `lp apps` | The apps you can see. `--mine` |
 | `lp store ls\|put\|get\|rm` | Files in an app's durable store |
 | `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |

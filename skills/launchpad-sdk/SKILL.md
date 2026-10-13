@@ -55,7 +55,8 @@ Traps worth knowing before you hit them:
   belongs in your `build` script.
 - **npm only** for Node. A committed `package-lock.json` selects `npm ci` and
   must be in sync; a yarn or pnpm lockfile alone means versions resolve fresh at
-  deploy time.
+  deploy time. The deploy is not refused, and its build log names the lockfile
+  that was passed over.
 - **A Go app cannot run an npm build during deploy.** Commit the built assets.
 - **A frontend-only repo with a `package.json`** is not static. Either add a
   server and a `start` script, or commit the build output and declare
@@ -90,6 +91,20 @@ page polls for. And **a document is rendered once, at build time** — there is 
 R behind the page, a re-render is a deploy rather than a restart, and whatever a
 chunk prints is published to everyone who can read the page.
 
+**A document app can still run jobs, and that surprises people.** No process
+behind the page does not mean no process at all: a job is a separate container
+running a command from the same release, and a document's release carries its
+venv or its R library like any other. So `[jobs]` in `launchpad.toml` works on an
+`.Rmd`, a `.qmd` and an `.ipynb`, and inside that job the SDK is fully present —
+`lp.run` is populated, `lp.mounts()` answers, and the job may write to storage.
+It is the one way a document app does anything after its build. What it cannot do
+is see a request: no viewer identity, no task the app can observe, because
+nothing here serves a request — the platform serves the rendered file.
+
+**`static` is the exception that really has none.** A `[jobs]` table in a static
+tree is refused before anything is built, with `manifest_invalid` and the reason:
+a folder of files has no runtime to run a command in.
+
 ## `launchpad.toml`
 
 Optional, committed, and the better door for anything it can say. Unknown
@@ -115,9 +130,11 @@ fallback = true               # client-side routing
 [jobs.nightly-report]
 command  = "python -m reports.nightly"
 schedule = "0 3 * * *"        # optional; omit for a job you start yourself
+timezone = "Europe/London"    # optional; the schedule is UTC without it
 timeout  = 1800
 memory   = 1024
 retries  = 2                  # off by default
+expect_within = "26h"         # optional; owners are told if it goes this long without succeeding
 viewer_runnable = true        # a viewer may start it
 
 [jobs.nightly-report.params.region]
@@ -126,7 +143,17 @@ required = true
 ```
 
 A job declared here versions with the code it runs, and a rollback takes the
-command back with it. Static apps may not declare jobs — there is no runtime in
+command back with it.
+
+**A program with no web server is a batch app.** Add an empty `[batch]` table
+(and `language = "python"` if the repository has more than one language's
+project file): the deploy installs dependencies, starts nothing, and the app's
+work is its `[jobs]`. Restart and Stop answer `no_service` on one.
+
+**A job can send.** `lp.notify(...)` (email, Slack, any integration an
+administrator attached to the app) works inside a job, with the run's own
+credential; everything else on the app surface — `lp.data`, `lp.who`, starting
+another job — is refused from a job with `job_send_only`. Static apps may not declare jobs — there is no runtime in
 which a command would mean anything — but scheduled tasks are fine, since those
 are HTTP requests to a path you published.
 
@@ -150,6 +177,8 @@ import lp "launchpad/lp"     // Go — no require line; the build's go.work reso
 
 ```r
 library(launchpad)           # R — installed into the release's renv library
+                             # store_put(store("drop"), "report.parquet") to write;
+                             # file.copy() to a store writes a zero-byte object
 ```
 
 Off-platform every call that needs the platform raises, throws or returns an
@@ -200,9 +229,21 @@ lp.app.id, lp.app.slug, lp.app.mode, lp.app.base_path
 lp.app.can("email")            # cheap and cached
 ```
 
+`mode` is **this workload's** mode, taken from the deployment that started it —
+not the app's configured setting — so it is right on the first request rather
+than after the next restart.
+
 ```js
 await lp.app.slug();  await lp.app.basePath();  await lp.app.can("slack");
 ```
+
+**In Node these are async methods, and forgetting that does not fail.**
+`lp.app.id` without the call and the `await` is a Promise, and a template that
+interpolates one renders `[object Promise]` — a page that looks deployed and is
+wrong, on the fact an app is most likely to put in its own header. Python
+exposes the same values as plain properties, so the shapes differ by language
+and only one of them tells you. Run your entrypoint off-platform once before the
+first deploy: it is the only check that finds this.
 
 `base_path` / `basePath()` / `BasePath` / `app_base_path()` answers the same
 value as the `BASE_PATH` variable above, and either spelling is safe to build
@@ -223,6 +264,33 @@ for this app" on a screen instead of leaving it to be found at 2am in a log.
 | `lp.storage("reports").path` / `lp.Storage(…).Path` | a durable volume an administrator mapped to this app, resolved by name |
 | `lp.store("reports").put(path)` / `lp.Store(…).Put(path, name)` | a file into an object store |
 | `lp.mounts()` / `lp.Mounts()` | everything mapped, with `read_only` / `ReadOnly()` |
+
+**One name can be two mounts.** A mapping's identity is
+`(resource, app, folder)`, so an administrator can attach one resource twice —
+the root read-only and a folder at `write`, at two paths in one workload. Both
+arrive under the same name, and the folder is what tells them apart:
+
+```python
+lp.storage("drop", folder="backup").path     # lp.store(name, folder=…) likewise
+```
+```js
+lp.storage("drop", { folder: "backup" });
+```
+```go
+lp.StorageIn("drop", "backup")               // Go has no keyword arguments
+```
+```r
+storage("drop", "backup")
+```
+
+A name matching two mounts **with no folder named raises**, listing what is
+mounted and at what level, rather than picking one — returning the first would
+answer by the alphabetical order of paths somebody else chose. Omitting the
+folder means *do not care*, which is the ordinary case and is ambiguous only
+when there genuinely is more than one; an empty folder names the root.
+
+In R, `scratch_dir()` is scratch space and is **not** where storage lives. They
+are two questions with two answers, and `mounts()` is how you ask the second.
 
 ### The app's one document
 
@@ -263,6 +331,12 @@ run.succeeded, run.output(), run.logs()
 A job is a different entrypoint of *this same app*, from the same release, in a
 container with its own memory limit and deadline. It never blocks on the work.
 
+Inside the job, `lp.run.scheduled_for` (Node `run.scheduledFor`, Go
+`run.ScheduledFor()`, R `scheduled_for()`) is **the instant this run is for**:
+the schedule tick it fired for, in the schedule's zone, even when it started
+late — or the time somebody named with `lp job run --for`. It is `None` when
+nobody gave one, never *now*, so a re-run of Tuesday's work processes Tuesday.
+
 **Two objects, and which one you call is the decision.** `lp.jobs` is the app
 acting as itself. `lp.viewer(request.headers).jobs` is the app acting for the
 person looking at the page — attribution that would otherwise be lost by
@@ -291,15 +365,39 @@ is `None` on a public app.
 
 ```python
 lp.run                                # the job's view of itself; None elsewhere
-task = lp.task(request.headers)       # a scheduled firing; None on an ordinary visit
+task = lp.task(request.headers)       # a firing; None on an ordinary visit
 if task:
-    task.log("read 1,204 rows")
+    task.log(f"read 1,204 rows for {task.name}")
 ```
 
-A scheduled task is an HTTP request the platform makes to a path you published —
-it owns no process, so `task.log(...)` is the only thing that makes that run's
-log exist. Worth adding to anything that might outlive the timeout: a run that
-never answers is recorded as a failure with nothing else in it.
+**A run given no payload is given no input location.** The variable is absent
+rather than pointing at an object nothing wrote, so *"was I given one?"* is
+answerable by looking rather than by reading and interpreting the error. A run
+started with parameters alone has no input — read the parameters. Read a payload
+**at the start of the run**: the link is presigned and expires, and a job that
+reads its input an hour in gets a refusal about the link, which every SDK says
+in those words.
+
+**A job holds no app token, and is told why** in all four languages. A run acts
+as the run; the calls it may make are the run's own, and a job reaching for the
+app's credential is a design question rather than a missing variable.
+
+A task is an HTTP request the platform makes to a path you published — it owns
+no process, so `task.log(...)` is the only thing that makes that run's log
+exist. Worth adding to anything that might outlive the timeout: a run that never
+answers is recorded as a failure with nothing else in it.
+
+**A task's schedule is optional, and your handler cannot tell.** A task created
+with no cron expression is fired only when somebody asks — `lp task run`, the
+Run now button, or your own app — and it travels the same firing path a schedule
+does, so `X-Launchpad-Cron: 1` is set either way and `lp.task(headers)` answers
+identically. Reading it means *this was a firing*, never *a schedule came
+round*.
+
+**`task.name` is the task's name, not its cron expression** (`Task.Name` in Go,
+`task.name` in Node). The platform sends the name so that one endpoint serving
+several tasks can tell which fired; nothing gives an app its own cron
+expression.
 
 ## Once it is deployed
 
