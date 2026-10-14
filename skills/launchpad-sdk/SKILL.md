@@ -380,7 +380,9 @@ in those words.
 
 **A job holds no app token, and is told why** in all four languages. A run acts
 as the run; the calls it may make are the run's own, and a job reaching for the
-app's credential is a design question rather than a missing variable.
+app's credential is a design question rather than a missing variable. The one
+exception is sending: a job may notify through its app's integrations, and every
+other app call is refused with `job_send_only`.
 
 A task is an HTTP request the platform makes to a path you published — it owns
 no process, so `task.log(...)` is the only thing that makes that run's log

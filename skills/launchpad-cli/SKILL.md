@@ -308,8 +308,8 @@ Two different things, and the CLI keeps them apart because the boundary is real:
   reads it as `LAUNCHPAD_SCHEDULED_FOR`. A job runs in a container where the
   install has a cluster and on the install's own machine where it does not;
   `lp job runs` says which, and the instant a run was for. `lp job list` prints
-  each job's schedule with its zone and any `expect_within` alert window. An install with no isolated backend has no
-  jobs, and says so as exit 2.
+  each job's schedule with its zone and any `expect_within` alert window.
+  Where the install cannot run jobs for an app, `lp` says why as exit 2.
 - **`lp task list|create|edit|delete|run|runs|logs`** — a scheduled task is an
   HTTP request to a path your app published, in the app's own process.
   `lp task run <name>` fires one now and waits as the job verb does, and a
@@ -476,7 +476,7 @@ with `lp api`, which is the point of the column on the right:
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
 | a task or job name that does not resolve (exit 2) | a name, not a run — the platform attempted nothing. `lp task list` and `lp job list` name what exists. This is exit **2**, never 1: exit 1 would mean the work ran and failed |
-| `background jobs are not available` (exit 2) | this install has no isolated backend. Configuration, not a bug in the job |
+| `background jobs are not available` (exit 2) | this install cannot run jobs for this app, and the message says why. Configuration, not a bug in the job |
 | `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 
 Everything takes `--help`.
