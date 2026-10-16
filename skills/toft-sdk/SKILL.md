@@ -237,6 +237,12 @@ than after the next restart.
 await toft.app.slug();  await toft.app.basePath();  await toft.app.can("slack");
 ```
 
+**R has a smaller surface**: `app_info()` and `app_base_path()` for the app's own
+facts, no `can`; `scratch_dir()` takes no argument and there is no session
+scratch; `notify(kind, …)` names the kind first; `caller_role(headers)` and
+`caller_can(headers, at_least)` answer the viewer's role; `mounts()`, `storage()`
+and `store()`/`store_put()` match the other languages.
+
 **In Node these are async methods, and forgetting that does not fail.**
 `toft.app.id` without the call and the `await` is a Promise, and a template that
 interpolates one renders `[object Promise]` — a page that looks deployed and is
@@ -416,3 +422,17 @@ Bearer $TOFT_TOKEN"` and a headless browser sending the same header both
 reach an app nobody has made public. The `toft-cli` skill has the whole
 recipe, the browser half included. Your app never sees that header: the gateway
 consumes it.
+
+## The full documentation
+
+| What | Where |
+|---|---|
+| The SDK, by topic | https://larchway-labs.github.io/toft-docs/latest/cli/sdk/what-it-is/ |
+| Every call, per language (Python, Node, R, Go) | https://larchway-labs.github.io/toft-docs/latest/cli/reference/languages/ |
+| How the build reads a repository | https://larchway-labs.github.io/toft-docs/latest/user/build/how-detection-works/ |
+| `toft.toml` | https://larchway-labs.github.io/toft-docs/latest/user/build/toft-toml/ |
+| Base paths | https://larchway-labs.github.io/toft-docs/latest/user/build/base-paths/ |
+| Jobs | https://larchway-labs.github.io/toft-docs/latest/user/automation/jobs/ |
+
+The SDK source is public at `larchway-labs/toft-sdk` (Apache-2.0), one tag per
+Toft release; the copy an app runs is the one the build installs.

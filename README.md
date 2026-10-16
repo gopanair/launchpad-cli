@@ -40,14 +40,14 @@ plain folder deploys.
 
 | | |
 |---|---|
-| `toft login [url]` | Sign in to an install. `--status` says who and where, `--forget` drops a stored credential, `--token-stdin` for CI |
+| `toft login [url]` | Sign in to an install. `--status` says who and where, `--forget` drops a stored credential (`--forget-all` every one), `--token-stdin` for CI |
 | `toft link <app>` | Record which app this directory deploys to. `--local` keeps it out of git |
-| `toft deploy [dir]` | Bundle and upload. `--logs` tails the app afterwards, `--json` for scripts |
+| `toft deploy [dir]` | Bundle and upload. `--logs` interleaves the build log, `--json` for scripts |
 | `toft status` | What is serving, since when, and from what |
 | `toft deps` | What the dependency policy says about the app. If a deploy was refused, this is the packages, the advisories and the versions that fix it |
 | `toft logs` | The app's log. `--follow`, or `--deploy <id>` for one build's output |
 | `toft rollback [id]` | Back to the previous release. Names it before it acts |
-| `toft create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead |
+| `toft create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead, and `--subdir <folder>` with it to build one folder of a repository that holds several apps |
 | `toft redeploy` | Build again from the app's own repository. Sends nothing from your disk |
 | `toft restart` / `toft start` | Restart the app, starting it if it is stopped. `--wait` waits until it is up and fails if it never comes up |
 | `toft stop` | Stop the app |
@@ -116,12 +116,13 @@ file with a secret in it never become one file.
 
 ## In CI
 
-Mint a personal API key from your install's keys page, put it in the runner's
-secret store, and:
+Have an administrator create a deploy key (`toftd_`, **Admin → Deploy keys**) —
+or use a personal key (`toftu_`, **Your account → Credentials**) — put it in the
+runner's secret store, and:
 
 ```bash
 export TOFT_URL=https://toft.your-company.com
-export TOFT_TOKEN=toftu_...
+export TOFT_TOKEN=toftd_...
 toft deploy --no-watch
 ```
 
@@ -189,6 +190,11 @@ installs dependencies, picks the language version, and starts the app. An agent
 with this binary and a key can create an app, push a directory, read the build
 log and roll back without Node, Python or a Go toolchain on the machine it is
 working on.
+
+## Documentation
+
+The full guide — every command and flag, signing in, deploying, CI and the app
+SDK — is at **https://larchway-labs.github.io/toft-docs/latest/cli/**. Toft's user and admin guides are on the same site.
 
 ## Verifying a download
 

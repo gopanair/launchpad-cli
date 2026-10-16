@@ -49,11 +49,12 @@ cleared before it will run.
 ## Signing in without a browser
 
 `toft login <url>` on its own opens a device flow and waits for a human. That is
-the wrong door for an agent. Use a personal API key (`lpu_`) or a deploy key
-(`lpd_`), which a person mints under **Account → API keys**:
+the wrong door for an agent. Use a personal API key (`toftu_`, which a person
+creates under **Your account → Credentials**) or a deploy key (`toftd_`, which an
+administrator creates under **Admin → Deploy keys**):
 
 ```bash
-printf '%s' "$LP_KEY" | toft login --token-stdin https://toft.corp
+printf '%s' "$TOFT_KEY" | toft login --token-stdin https://toft.corp
 ```
 
 **Flags come before the positional argument.** `toft login <url> --token-stdin`
@@ -82,7 +83,7 @@ refused, exit 2, naming both halves. Setting both variables at once is also a
 refusal, not a precedence.
 
 `toft login --status` says who and where. `toft login --forget <install>` drops a
-stored credential; it does **not** revoke the key, and the command says so.
+stored credential (`--forget-all` drops every one); it does **not** revoke the key, and the command says so.
 
 ## The loop
 
@@ -101,7 +102,10 @@ toft rollback --yes               # back to the previous release
 - **`toft create`** claims a name in the estate's namespace, so it says which slug
   it will take and asks first. `--yes` answers. `--link` writes
   `toft.toml`, so later commands in this directory know the app.
-  `--repo <url>` creates from a repository instead and bundles nothing.
+  `--repo <url>` creates from a repository instead and bundles nothing;
+  `--subdir <folder>` with it builds one folder of a repository holding several
+  apps, and the slug then defaults to the folder's name. `toft status` names the
+  folder.
 - **`toft deploy`** bundles the working directory as it is, uncommitted edits
   included. It needs no git remote, no commit, not even a repository. It never
   creates an app — a missing link is exit 2 naming `toft link <slug>`.
@@ -298,8 +302,9 @@ not refused — do not put secrets in the tree.
 
 Two different things, and the CLI keeps them apart because the boundary is real:
 
-- **`toft job list|run|runs|logs|cancel`** — a job runs in a container of its own,
-  with its own memory limit and deadline, from the same release. Declare one in
+- **`toft job list|run|runs|logs|cancel`** — a job runs apart from the web
+  process, with its own memory limit and deadline, from the same release — in a
+  container of its own on a cluster, on the install's own machine otherwise. Declare one in
   `toft.toml`. `toft job run <name>` waits by default and the run's outcome
   is the exit code — **`--json` included**, where a failed run prints the run
   document *and then* the refusal, two lines, exit 1; `--param k=v` repeats and
@@ -387,6 +392,8 @@ in the build log naming both, never a failed deploy.
 Nothing is published to a registry in any language, and that is deliberate: a
 published package is a second version, and you would then be building against
 whichever one your package manager resolved.
+  `toft task logs <runID> --task <name>` reads one run's log; the task name is
+  required because a run id alone does not say which task it belongs to.
 
 - **Go** also gets a `go.work` naming the vendored module. No require line is
   added to your `go.mod` — a workspace resolves the import without one. Both
@@ -396,9 +403,10 @@ whichever one your package manager resolved.
   that did not ship, and the build fails there while working here.
 - **Python**: `uv pip install -e .toft/sdk-python`.
 - **Node**: `"@larchway/toft": "file:.toft/sdk-node"` in `package.json`.
-- **R**: `renv::install(".toft/sdk-r")`, or nothing at all — the build
-  installs `toft` into the release's library either way, and unlike Go
-  there is no compile step here to fail without it.
+- **R** is not vendored — the install serves the Go, Python and Node SDKs, and
+  `--lang r` is refused with `sdk_language_unknown`. The build installs the R
+  package into the release's library, and unlike Go there is no compile step
+  here to fail without it.
 
 Re-run it after the install is upgraded. Delete both paths to go back to the
 platform's own copy.
@@ -480,3 +488,17 @@ with `toft api`, which is the point of the column on the right:
 | `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 
 Everything takes `--help`.
+
+## The full documentation
+
+These pages are the reference this skill is the field manual for. They describe
+the install's own version at `/<minor>/`; `latest/` is the newest.
+
+| What | Where |
+|---|---|
+| Installing `toft` | https://larchway-labs.github.io/toft-docs/latest/cli/cli/installing/ |
+| Signing in and API keys | https://larchway-labs.github.io/toft-docs/latest/cli/cli/signing-in/ |
+| Deploying | https://larchway-labs.github.io/toft-docs/latest/cli/cli/deploying/ |
+| Every command and flag | https://larchway-labs.github.io/toft-docs/latest/cli/cli/commands/ |
+| The app SDK | https://larchway-labs.github.io/toft-docs/latest/cli/sdk/what-it-is/ |
+| The user guide (deploying from git, sharing, jobs) | https://larchway-labs.github.io/toft-docs/latest/user/start/what-toft-is/ |
