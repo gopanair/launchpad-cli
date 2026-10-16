@@ -245,7 +245,7 @@ A contract, and the reason a failed run can be triaged without reading the log:
 | 0 | it worked |
 | 1 | the platform did the thing and it failed — a failed build, a refused scan, a failed job run |
 | 2 | usage or configuration — no app linked, a bad flag, jobs not available on this install, a confirmation nothing could answer, **an app that is locked**, or **a name that does not resolve** |
-| 3 | not authenticated, or refused — no credential, a revoked or expired key, uploads switched off, a licence limit |
+| 3 | not authenticated, or refused — no credential, a revoked or expired key, uploads switched off, a license limit |
 | 4 | the install did not answer |
 
 ## Running unattended
@@ -472,7 +472,7 @@ with `toft api`, which is the point of the column on the right:
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
 | `that key can read and not write` (exit 3, `key_read_scope`) | the key was minted read-only in the browser. A scope cannot be widened — ask for a full key. Retrying, or reading first to "warm it up", changes nothing |
 | `forbidden` (exit 3, `deny_system_role`) | the account is a **viewer** on this install and publishing needs the publisher role. The install says only "forbidden" — this code is the whole diagnosis. An administrator changes a system role; there is no flag, no other command and no retry that reaches it. A **personal** key can lodge the ask — an empty `POST /api/v1/me/promotion-requests`, which notifies the administrators and answers 409 if one is already pending — and then say who has to act. A deploy key cannot, and neither can a service account |
-| a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
+| a license limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
 | the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `toft deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
 | a task or job name that does not resolve (exit 2) | a name, not a run — the platform attempted nothing. `toft task list` and `toft job list` name what exists. This is exit **2**, never 1: exit 1 would mean the work ran and failed |
