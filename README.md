@@ -1,10 +1,10 @@
-# lp — the Launchpad command-line client
+# toft — the Toft command-line client
 
-`lp` deploys a directory on your disk to a [Launchpad](https://github.com/gopanair/launchpad-install)
+`toft` deploys a directory on your disk to a [Toft](https://github.com/larchway-labs/toft-install)
 install, watches the build, and reads the logs afterwards.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh
 ```
 
 One binary. No dependencies, no daemon, no root — it lands in `/usr/local/bin`
@@ -16,7 +16,7 @@ Windows it names the file to download rather than failing at one.
 
 The binaries are unsigned. On macOS that is invisible when you install with the
 script — `curl` does not mark a download the way a browser does. On Windows,
-Smart App Control may refuse `lp.exe` outright; if it does, there is no
+Smart App Control may refuse `toft.exe` outright; if it does, there is no
 per-file exception to add and turning Smart App Control off is not a trade
 worth making for a CLI.
 
@@ -26,13 +26,13 @@ build per platform plus a `SHA256SUMS` the installer checks.
 ## Getting started
 
 ```bash
-lp login https://launchpad.your-company.com   # opens a browser, once
+toft login https://toft.your-company.com   # opens a browser, once
 cd ~/code/my-app
-lp link my-app                                # names the app this directory deploys to
-lp deploy                                     # pushes what is on your disk
+toft link my-app                                # names the app this directory deploys to
+toft deploy                                     # pushes what is on your disk
 ```
 
-`lp deploy` bundles the working tree — respecting every `.gitignore` in it — and
+`toft deploy` bundles the working tree — respecting every `.gitignore` in it — and
 uploads it. It does not need a git remote, a commit, or even a repository; a
 plain folder deploys.
 
@@ -40,31 +40,31 @@ plain folder deploys.
 
 | | |
 |---|---|
-| `lp login [url]` | Sign in to an install. `--status` says who and where, `--forget` drops a stored credential, `--token-stdin` for CI |
-| `lp link <app>` | Record which app this directory deploys to. `--local` keeps it out of git |
-| `lp deploy [dir]` | Bundle and upload. `--logs` tails the app afterwards, `--json` for scripts |
-| `lp status` | What is serving, since when, and from what |
-| `lp deps` | What the dependency policy says about the app. If a deploy was refused, this is the packages, the advisories and the versions that fix it |
-| `lp logs` | The app's log. `--follow`, or `--deploy <id>` for one build's output |
-| `lp rollback [id]` | Back to the previous release. Names it before it acts |
-| `lp create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead |
-| `lp redeploy` | Build again from the app's own repository. Sends nothing from your disk |
-| `lp restart` / `lp start` | Restart the app, starting it if it is stopped. `--wait` waits until it is up and fails if it never comes up |
-| `lp stop` | Stop the app |
-| `lp events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
-| `lp job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container where the install has a cluster and on the install's own machine where it does not, each with its own memory limit. `lp job run` waits for the job and fails if it fails. `--param k=v` to pass values, `--for <time>` to name the instant the run is for |
-| `lp task list\|create\|edit\|delete\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. `create` needs `--path`, and `--schedule` (with `--timezone` for a zone other than UTC) only if you want the platform to call it on a timetable; `edit` changes only the fields you name |
-| `lp apps` | The apps you can see. `--mine` |
-| `lp store ls\|put\|get\|rm` | Files in an app's durable store |
-| `lp sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
-| `lp api <method> <path>` | Call this install's HTTP API with the credential `lp` already holds — the way round a verb `lp` does not have, without putting the key in a shell variable. `--data` takes JSON, `@file` or `@-`. A path with no leading slash is read as relative to `/api/v1/`, so `lp api GET apps` and `lp api GET /api/v1/apps` are the same call |
+| `toft login [url]` | Sign in to an install. `--status` says who and where, `--forget` drops a stored credential, `--token-stdin` for CI |
+| `toft link <app>` | Record which app this directory deploys to. `--local` keeps it out of git |
+| `toft deploy [dir]` | Bundle and upload. `--logs` tails the app afterwards, `--json` for scripts |
+| `toft status` | What is serving, since when, and from what |
+| `toft deps` | What the dependency policy says about the app. If a deploy was refused, this is the packages, the advisories and the versions that fix it |
+| `toft logs` | The app's log. `--follow`, or `--deploy <id>` for one build's output |
+| `toft rollback [id]` | Back to the previous release. Names it before it acts |
+| `toft create [dir]` | Make a new app and deploy this directory into it. Tells you the name it will take and asks first. `--repo <url>` to build from a repository instead |
+| `toft redeploy` | Build again from the app's own repository. Sends nothing from your disk |
+| `toft restart` / `toft start` | Restart the app, starting it if it is stopped. `--wait` waits until it is up and fails if it never comes up |
+| `toft stop` | Stop the app |
+| `toft events` | What has gone wrong with this app. `--since 2h`, `--severity`, `--kind` |
+| `toft job list\|run\|runs\|logs\|cancel` | Jobs, which run in a container where the install has a cluster and on the install's own machine where it does not, each with its own memory limit. `toft job run` waits for the job and fails if it fails. `--param k=v` to pass values, `--for <time>` to name the instant the run is for |
+| `toft task list\|create\|edit\|delete\|run\|runs\|logs` | Scheduled tasks, which are HTTP requests to a path your app publishes. `create` needs `--path`, and `--schedule` (with `--timezone` for a zone other than UTC) only if you want the platform to call it on a timetable; `edit` changes only the fields you name |
+| `toft apps` | The apps you can see. `--mine` |
+| `toft store ls\|put\|get\|rm` | Files in an app's durable store |
+| `toft sdk vendor` | The app SDK this install carries, written into your working directory so your editor, `go build` and your CI can see it |
+| `toft api <method> <path>` | Call this install's HTTP API with the credential `toft` already holds — the way round a verb `toft` does not have, without putting the key in a shell variable. `--data` takes JSON, `@file` or `@-`. A path with no leading slash is read as relative to `/api/v1/`, so `toft api GET apps` and `toft api GET /api/v1/apps` are the same call |
 
 Every command takes `--help`, and every command takes `--json`.
 
 ## Reading the output from a script
 
 `--json` puts the answer on standard output and leaves the running commentary on
-standard error, so `lp status --json | jq -r .url` works without thinking about
+standard error, so `toft status --json | jq -r .url` works without thinking about
 it. Two things are worth knowing:
 
 - **A failed deploy tells you what to do about it.** The result object carries
@@ -83,34 +83,34 @@ it. Two things are worth knowing:
 |---|---|
 | Linux | x86_64 and arm64 — the install script above |
 | macOS | Intel and Apple Silicon — the same install script |
-| Windows | x86_64 — download `lp_windows_amd64.exe` from [Releases](https://github.com/gopanair/launchpad-cli/releases), rename it `lp.exe`, and put it somewhere on your PATH |
+| Windows | x86_64 — download `toft_windows_amd64.exe` from [Releases](https://github.com/larchway-labs/toft-cli/releases), rename it `toft.exe`, and put it somewhere on your PATH |
 
 ### Windows
 
 ```powershell
-curl.exe -fsSLo lp.exe https://github.com/gopanair/launchpad-cli/releases/latest/download/lp_windows_amd64.exe
+curl.exe -fsSLo toft.exe https://github.com/larchway-labs/toft-cli/releases/latest/download/toft_windows_amd64.exe
 ```
 
 Windows may warn about a program from an unknown publisher the first time you
 run it — the binaries are not code-signed yet.
 
-**If you run `lp` from Git Bash**, set `MSYS_NO_PATHCONV=1` first, or use paths
+**If you run `toft` from Git Bash**, set `MSYS_NO_PATHCONV=1` first, or use paths
 without a leading slash. Git Bash rewrites an argument that looks like a Unix
-path into a Windows one before `lp` starts, so `lp api GET /api/v1/apps` arrives
-as `C:/Program Files/Git/api/v1/apps`. `lp` recognises that and says so, but the
-relative form — `lp api GET apps` — is never rewritten and needs nothing.
+path into a Windows one before `toft` starts, so `toft api GET /api/v1/apps` arrives
+as `C:/Program Files/Git/api/v1/apps`. `toft` recognises that and says so, but the
+relative form — `toft api GET apps` — is never rewritten and needs nothing.
 
 ## Configuration
 
 Everything resolves the same way, most specific first:
 
-> `--flag` → `LAUNCHPAD_*` → `.launchpad.toml` → `launchpad.toml` → `~/.config/launchpad/config.toml` → the default
+> `--flag` → `TOFT_*` → `.toft.toml` → `toft.toml` → `~/.config/toft/config.toml` → the default
 
-`LAUNCHPAD_URL` and `LAUNCHPAD_APP` are the two environment variables.
+`TOFT_URL` and `TOFT_APP` are the two environment variables.
 
-**The credential is never a flag.** `lp login` writes it to
-`~/.config/launchpad/credentials.toml` at mode `0600`; CI reads it from
-`LAUNCHPAD_TOKEN` instead. That file holds credentials and nothing else — the
+**The credential is never a flag.** `toft login` writes it to
+`~/.config/toft/credentials.toml` at mode `0600`; CI reads it from
+`TOFT_TOKEN` instead. That file holds credentials and nothing else — the
 settings live beside it in `config.toml`, so a file you are meant to edit and a
 file with a secret in it never become one file.
 
@@ -120,9 +120,9 @@ Mint a personal API key from your install's keys page, put it in the runner's
 secret store, and:
 
 ```bash
-export LAUNCHPAD_URL=https://launchpad.your-company.com
-export LAUNCHPAD_TOKEN=lpu_...
-lp deploy --no-watch
+export TOFT_URL=https://toft.your-company.com
+export TOFT_TOKEN=toftu_...
+toft deploy --no-watch
 ```
 
 **Give that key full access, not read-only.** A key's scope is chosen when it is
@@ -130,29 +130,29 @@ minted and cannot be widened afterwards — a read-only one is replaced, not
 changed. It will fetch status and logs quite happily and then fail every deploy
 with exit 3, which in a pipeline log looks like a permissions problem with the
 account rather than a choice somebody made on the keys page. Signing in with
-`lp login` always creates a full key, so this only bites a key pasted in from
+`toft login` always creates a full key, so this only bites a key pasted in from
 the browser.
 
 Where the runner mounts secrets as files rather than exporting them, use
-`LAUNCHPAD_TOKEN_FILE` and give it the path — an environment variable is visible
+`TOFT_TOKEN_FILE` and give it the path — an environment variable is visible
 in `/proc`, inherited by every child process and printed by any diagnostic that
 dumps the environment, while a path is not sensitive. Setting both is refused
 rather than resolved: a job exporting two tokens does not know which one it is
 using.
 
-`lp` detects that nothing can answer a prompt — stdin is not a terminal, or `CI`
+`toft` detects that nothing can answer a prompt — stdin is not a terminal, or `CI`
 is set — and exits rather than hanging on a confirmation nobody can see.
 
 A whole pipeline is the same shape. Each step fails the build if it fails, so
 you do not need to check anything yourself:
 
 ```bash
-lp deploy                 # ship it, and wait for the build
-lp job run migrate        # run the migration, and wait for it
-lp restart --wait         # pick up the new configuration, and wait for it
+toft deploy                 # ship it, and wait for the build
+toft job run migrate        # run the migration, and wait for it
+toft restart --wait         # pick up the new configuration, and wait for it
 ```
 
-If a step fails, `lp events` says what the platform noticed.
+If a step fails, `toft events` says what the platform noticed.
 
 **Exit codes are a contract:**
 
@@ -171,16 +171,16 @@ to ship an app here without a person watching:
 
 | | |
 |---|---|
-| [`skills/launchpad-cli`](skills/launchpad-cli/SKILL.md) | signing in without a browser, the deploy loop, the exit codes, what goes in the bundle, and what `lp` deliberately does not do |
-| [`skills/launchpad-sdk`](skills/launchpad-sdk/SKILL.md) | writing the app itself: `PORT`, `HOST` and `BASE_PATH`, how the build detects a framework, `launchpad.toml`, and the app SDK |
+| [`skills/toft-cli`](skills/toft-cli/SKILL.md) | signing in without a browser, the deploy loop, the exit codes, what goes in the bundle, and what `toft` deliberately does not do |
+| [`skills/toft-sdk`](skills/toft-sdk/SKILL.md) | writing the app itself: `PORT`, `HOST` and `BASE_PATH`, how the build detects a framework, `toft.toml`, and the app SDK |
 
 For Claude Code, drop them where it looks for skills:
 
 ```bash
-for s in launchpad-cli launchpad-sdk; do
+for s in toft-cli toft-sdk; do
     mkdir -p ~/.claude/skills/$s
     curl -fsSL -o ~/.claude/skills/$s/SKILL.md \
-        https://raw.githubusercontent.com/gopanair/launchpad-cli/main/skills/$s/SKILL.md
+        https://raw.githubusercontent.com/larchway-labs/toft-cli/main/skills/$s/SKILL.md
 done
 ```
 
@@ -193,17 +193,17 @@ working on.
 ## Verifying a download
 
 ```bash
-curl -fsSLO https://github.com/gopanair/launchpad-cli/releases/download/v0.1.0/lp_linux_amd64
-curl -fsSLO https://github.com/gopanair/launchpad-cli/releases/download/v0.1.0/SHA256SUMS
-grep lp_linux_amd64 SHA256SUMS | sha256sum -c
+curl -fsSLO https://github.com/larchway-labs/toft-cli/releases/download/v0.1.0/toft_linux_amd64
+curl -fsSLO https://github.com/larchway-labs/toft-cli/releases/download/v0.1.0/SHA256SUMS
+grep toft_linux_amd64 SHA256SUMS | sha256sum -c
 ```
 
 The installer does this for you.
 
 ## Versions
 
-`lp` and the install it talks to share one version number, and an older client
-against a newer install is the normal case rather than a problem: `lp` says so
+`toft` and the install it talks to share one version number, and an older client
+against a newer install is the normal case rather than a problem: `toft` says so
 in one dimmed line, renders anything it does not recognise by name, and carries
 on. It is never refused for being old.
 
@@ -211,31 +211,31 @@ on. It is never refused for being old.
 
 Re-run the installer. It downloads the newest published release, checks it
 against `SHA256SUMS`, and renames the new binary over the old one — so it is
-also how you upgrade a `lp` that is running.
+also how you upgrade a `toft` that is running.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh
 ```
 
-`lp --version` says which one you have. To install a particular release, or to
+`toft --version` says which one you have. To install a particular release, or to
 go back to one, pass the version through to the script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh -s -- --version 0.1.0
+curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh -s -- --version 0.1.0
 ```
 
 `--version latest` follows the newest release rather than the one the script was
 published with; `--dir` puts it somewhere else. Nothing else is kept anywhere —
-`~/.config/launchpad` is untouched by an upgrade, so you stay signed in.
+`~/.config/toft` is untouched by an upgrade, so you stay signed in.
 
-On **Windows**, download `lp_windows_amd64.exe` again and replace your `lp.exe`
+On **Windows**, download `toft_windows_amd64.exe` again and replace your `toft.exe`
 with it. Nothing else changes.
 
 ## Uninstalling
 
 ```bash
-rm "$(command -v lp)"
-rm -rf ~/.config/launchpad
+rm "$(command -v toft)"
+rm -rf ~/.config/toft
 ```
 
 Deleting the credential file does **not** revoke the keys — that is the keys

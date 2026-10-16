@@ -1,40 +1,40 @@
 ---
-name: launchpad-cli
-description: Deploy an app to a Launchpad install with `lp`, the command-line client — sign in without a browser, create an app, push the working directory, watch the build, read the logs, roll back, and run jobs and scheduled tasks. Load it whenever you are deploying to Launchpad, are asked to ship code to a Launchpad install, or hit an `lp` command that refused something. Nothing here needs Node, Python or a language toolchain on the machine you are working on — the install builds.
+name: toft-cli
+description: Deploy an app to a Toft install with `toft`, the command-line client — sign in without a browser, create an app, push the working directory, watch the build, read the logs, roll back, and run jobs and scheduled tasks. Load it whenever you are deploying to Toft, are asked to ship code to a Toft install, or hit an `toft` command that refused something. Nothing here needs Node, Python or a language toolchain on the machine you are working on — the install builds.
 ---
 
-# Deploying to Launchpad with `lp`
+# Deploying to Toft with `toft`
 
-`lp` pushes a directory to a Launchpad install, which builds it and serves it.
+`toft` pushes a directory to a Toft install, which builds it and serves it.
 **The build happens on the install, not here.** You do not need `npm`, `node`,
 `pip`, `uv`, a virtualenv, a Go toolchain or an R installation on this machine
 to ship a Node, Python, Go, R or static app — you need the source on disk and
 this one binary.
 
-That is what makes the whole loop available to an agent: write files, `lp
+That is what makes the whole loop available to an agent: write files, `toft
 deploy`, read what the platform says, fix, deploy again.
 
 | Platform | How |
 |---|---|
 | Linux x86_64, arm64 | `install.sh` |
 | macOS Intel, Apple Silicon | `install.sh` |
-| Windows x86_64 | download `lp_windows_amd64.exe` by hand |
+| Windows x86_64 | download `toft_windows_amd64.exe` by hand |
 
 On Linux and macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh
 ```
 
 On **Windows** the script refuses rather than downloading something that does
 not exist. Take the binary directly and put it on your PATH:
 
 ```powershell
-curl.exe -fsSLo lp.exe https://github.com/gopanair/launchpad-cli/releases/latest/download/lp_windows_amd64.exe
+curl.exe -fsSLo toft.exe https://github.com/larchway-labs/toft-cli/releases/latest/download/toft_windows_amd64.exe
 ```
 
 **The binaries are unsigned, and on Windows that can stop the install dead.**
-With Smart App Control enforcing, `lp.exe` is refused however it was obtained —
+With Smart App Control enforcing, `toft.exe` is refused however it was obtained —
 the download is intact and matches the published checksum, and Windows blocks it
 anyway for having no signature and no reputation. There is no per-file
 exception: the only lever is switching Smart App Control off, which Windows
@@ -48,21 +48,21 @@ cleared before it will run.
 
 ## Signing in without a browser
 
-`lp login <url>` on its own opens a device flow and waits for a human. That is
+`toft login <url>` on its own opens a device flow and waits for a human. That is
 the wrong door for an agent. Use a personal API key (`lpu_`) or a deploy key
 (`lpd_`), which a person mints under **Account → API keys**:
 
 ```bash
-printf '%s' "$LP_KEY" | lp login --token-stdin https://launchpad.corp
+printf '%s' "$LP_KEY" | toft login --token-stdin https://toft.corp
 ```
 
-**Flags come before the positional argument.** `lp login <url> --token-stdin`
+**Flags come before the positional argument.** `toft login <url> --token-stdin`
 is refused, exit 2 — the flag would otherwise be dropped and you would be back
 in the device flow.
 
 **A key has a scope, and a read-scoped one cannot deploy.** The scope is fixed
 when the key is minted and cannot be widened afterwards, so a read key is
-replaced rather than changed. The key `lp login`'s device flow mints is always
+replaced rather than changed. The key `toft login`'s device flow mints is always
 full — there is no `--scope` — so a read key can only reach you through
 `--token-stdin` or the environment, from a person who minted one in the browser.
 Every GET works, and the first write comes back exit 3 with
@@ -73,49 +73,49 @@ and in every `ps` on the machine. The two other doors are environment variables:
 
 | | |
 |---|---|
-| `LAUNCHPAD_TOKEN` | the key itself — **and it is only used when `LAUNCHPAD_URL` is set too** |
-| `LAUNCHPAD_TOKEN_FILE` | a path to read it from, for a mounted secret |
+| `TOFT_TOKEN` | the key itself — **and it is only used when `TOFT_URL` is set too** |
+| `TOFT_TOKEN_FILE` | a path to read it from, for a mounted secret |
 
 A credential and an address are one statement. A token in the environment with
 the install coming from anywhere else — a stored default, `--install` — is
 refused, exit 2, naming both halves. Setting both variables at once is also a
 refusal, not a precedence.
 
-`lp login --status` says who and where. `lp login --forget <install>` drops a
+`toft login --status` says who and where. `toft login --forget <install>` drops a
 stored credential; it does **not** revoke the key, and the command says so.
 
 ## The loop
 
 ```bash
 cd ~/code/my-app
-lp create --yes --link          # claim a slug, deploy this tree into it
+toft create --yes --link          # claim a slug, deploy this tree into it
 # …edit files…
-lp deploy                       # push what is on disk now
-lp status                       # what is serving, since when, from what
-lp logs --follow                # what the app said
-lp events                       # what the platform noticed
-lp deps                         # what the dependency policy says about it
-lp rollback --yes               # back to the previous release
+toft deploy                       # push what is on disk now
+toft status                       # what is serving, since when, from what
+toft logs --follow                # what the app said
+toft events                       # what the platform noticed
+toft deps                         # what the dependency policy says about it
+toft rollback --yes               # back to the previous release
 ```
 
-- **`lp create`** claims a name in the estate's namespace, so it says which slug
+- **`toft create`** claims a name in the estate's namespace, so it says which slug
   it will take and asks first. `--yes` answers. `--link` writes
-  `launchpad.toml`, so later commands in this directory know the app.
+  `toft.toml`, so later commands in this directory know the app.
   `--repo <url>` creates from a repository instead and bundles nothing.
-- **`lp deploy`** bundles the working directory as it is, uncommitted edits
+- **`toft deploy`** bundles the working directory as it is, uncommitted edits
   included. It needs no git remote, no commit, not even a repository. It never
-  creates an app — a missing link is exit 2 naming `lp link <slug>`.
-- **`lp redeploy`** rebuilds from the repository the app names and uploads
-  nothing. On an uploaded app it is refused, naming `lp deploy`.
-- **`lp restart --wait`** starts a stopped app and fails if it does not come up.
-  `lp start` is the same call under the name that reads right when it is
-  stopped; `lp stop` stops it.
-- **`lp apps`** lists the apps this credential can see, `--mine` for the ones it
+  creates an app — a missing link is exit 2 naming `toft link <slug>`.
+- **`toft redeploy`** rebuilds from the repository the app names and uploads
+  nothing. On an uploaded app it is refused, naming `toft deploy`.
+- **`toft restart --wait`** starts a stopped app and fails if it does not come up.
+  `toft start` is the same call under the name that reads right when it is
+  stopped; `toft stop` stops it.
+- **`toft apps`** lists the apps this credential can see, `--mine` for the ones it
   owns. It is how to find a slug you do not know.
 
 ## Watching a build, and reading it afterwards
 
-`lp deploy` prints the phases live — upload, scan, deploy — and exits non-zero
+`toft deploy` prints the phases live — upload, scan, deploy — and exits non-zero
 if the build fails. `--logs` interleaves the build log, which is where the
 framework detection, the dependency install and the language version are
 narrated. **`--json` is NDJSON everywhere — one document per line, not one per
@@ -124,7 +124,7 @@ stops at the second. Add `--json` for NDJSON progress frames and one result obje
 end, which is the shape to parse rather than the pretty output.
 
 **A successful deploy can still carry `warnings`.** They are the things the
-platform noticed and carried on past — a table in `launchpad.toml` that no
+platform noticed and carried on past — a table in `toft.toml` that no
 reader names, most often — and they are absent from the object when there are
 none, and absent from an install older than the field, which means "this install
 does not report warnings" rather than "there were none".
@@ -140,17 +140,17 @@ that reason — so in most cases you do not need a second command:
 
 | `reason` | What it means, and what to do |
 |---|---|
-| `build_failed` | The build or dependency install failed. `log_tail` is in the object; `lp logs --deploy <id>` has the rest |
-| `start_failed` · `not_ready` | It **built** and then would not answer. The build log ends in "Ready." and tells you nothing — read `lp logs`, the app's own output |
-| `dependency_blocked` | This install's dependency policy refused named packages. The findings are in the object under `dependencies`, and `lp deps` is the same answer. **Not a bug in your code** |
+| `build_failed` | The build or dependency install failed. `log_tail` is in the object; `toft logs --deploy <id>` has the rest |
+| `start_failed` · `not_ready` | It **built** and then would not answer. The build log ends in "Ready." and tells you nothing — read `toft logs`, the app's own output |
+| `dependency_blocked` | This install's dependency policy refused named packages. The findings are in the object under `dependencies`, and `toft deps` is the same answer. **Not a bug in your code** |
 | `source_blocked` | The install refuses that repository, URL or branch. Not fixable by pushing; ask an administrator |
 | `unsupported_framework` | Nothing in the tree the platform knows how to serve |
-| `manifest_invalid` | `launchpad.toml` was read and rejected. A one-file fix, and the message says which |
+| `manifest_invalid` | `toft.toml` was read and rejected. A one-file fix, and the message says which |
 | `runtime_version` | The language version you declared is not available on this install |
 | `source_unavailable` | The clone, the credential, or a pruned rollback target — the code could not be fetched |
 | `internal_error` | The platform, not your app. Retry, then tell somebody |
 
-A `reason` you do not recognise means the install is newer than your `lp`; treat
+A `reason` you do not recognise means the install is newer than your `toft`; treat
 it as `build_failed` and read the build log. An **absent** `reason` means the
 install is older than the field — it is not a category, so fall back to `phase`
 and `step`.
@@ -159,11 +159,11 @@ Afterwards:
 
 | | |
 |---|---|
-| `lp logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform`. `--json` is one object per line: `at`, `source`, `stream`, `line`, and on exactly one line a `marker` |
-| `lp logs --deploy <id>` | one build's log instead. `--source` and `--since` are refused with it |
-| `lp events` | what the platform noticed going wrong — the command to run after a restart that did not take |
-| `lp status --json` | the app, the serving release, and the app's URL |
-| `lp deps --json` | the packages, the advisories, and the versions that fix a refused deploy |
+| `toft logs` | the app's runtime log — `--follow`, `--lines`, `--since 2h`, `--source app\|platform`. `--json` is one object per line: `at`, `source`, `stream`, `line`, and on exactly one line a `marker` |
+| `toft logs --deploy <id>` | one build's log instead. `--source` and `--since` are refused with it |
+| `toft events` | what the platform noticed going wrong — the command to run after a restart that did not take |
+| `toft status --json` | the app, the serving release, and the app's URL |
+| `toft deps --json` | the packages, the advisories, and the versions that fix a refused deploy |
 
 ## When the dependency policy refuses a deploy
 
@@ -172,7 +172,7 @@ administrator's decision about the whole install, not a judgement about your
 code, and **it is the one failure with a structured answer waiting for you**:
 
 ```sh
-lp deps --json | jq '.refused.findings[] | {package, version, advisory_id, severity, fixed_in, path}'
+toft deps --json | jq '.refused.findings[] | {package, version, advisory_id, severity, fixed_in, path}'
 ```
 
 - `fixed_in` is the version to move to. When it is empty, no fix has been
@@ -192,12 +192,12 @@ lp deps --json | jq '.refused.findings[] | {package, version, advisory_id, sever
   without a deploy. It resolves nothing and installs nothing — same packages,
   same feed — so it is worth a call only when one of those two has changed.
 
-`lp deps` needs edit access to the app: an exact package-and-version list of a
+`toft deps` needs edit access to the app: an exact package-and-version list of a
 running internal tool is a target map, so a viewer cannot read it.
 
 ## Looking at the app
 
-`lp status --json` carries `url`, and it is the install's own answer rather than
+`toft status --json` carries `url`, and it is the install's own answer rather than
 its address with a path stuck on the end — so it is right whether or not that
 install serves deployed apps on a second origin.
 
@@ -207,12 +207,12 @@ the way in.** The apps gateway takes it as a bearer credential and then
 authorizes you exactly as it would in a browser:
 
 ```sh
-URL=$(lp status --json | jq -r .url)
-curl -fsS -H "Authorization: Bearer $LAUNCHPAD_TOKEN" "$URL/"
+URL=$(toft status --json | jq -r .url)
+curl -fsS -H "Authorization: Bearer $TOFT_TOKEN" "$URL/"
 ```
 
 The gateway consumes the key and strips it: the app process never sees it, and
-never learns which credential the request arrived on. An app key (`lp_…`) works
+never learns which credential the request arrived on. An app key (`toft_…`) works
 the same way for the one app it grants.
 
 **In a headless browser** — for a screenshot, or a page that only exists after
@@ -221,7 +221,7 @@ its JavaScript has run — send the same header on every request the page makes:
 ```js
 // Playwright
 const ctx = await browser.newContext({
-  extraHTTPHeaders: { Authorization: `Bearer ${process.env.LAUNCHPAD_TOKEN}` },
+  extraHTTPHeaders: { Authorization: `Bearer ${process.env.TOFT_TOKEN}` },
 });
 // Puppeteer:  await page.setExtraHTTPHeaders({ Authorization: ... })
 // CDP direct: Network.setExtraHTTPHeaders
@@ -250,10 +250,10 @@ A contract, and the reason a failed run can be triaged without reading the log:
 
 ## Running unattended
 
-Confirmations are detected, not remembered: `lp` treats the run as unattended
+Confirmations are detected, not remembered: `toft` treats the run as unattended
 when `--yes` is passed, `CI` is set, or stdin is not a terminal — and then it
 **refuses rather than hanging** on a question nobody can answer. Pass `--yes` to
-anything that would ask (`lp create`, `lp rollback`, `lp task delete`).
+anything that would ask (`toft create`, `toft rollback`, `toft task delete`).
 
 `-q` drops the narration and keeps the answer on stdout. `--json` is on every
 command. `--no-color` (or `NO_COLOR`) for a clean log.
@@ -274,7 +274,7 @@ result object already said everything, so there is no second document.
 ## What goes in the bundle
 
 `.gitignore` decides — every one in the tree, `!` negations honoured — and git
-is never shelled out to, so a plain folder bundles fine. `.launchpadignore` adds
+is never shelled out to, so a plain folder bundles fine. `.toftignore` adds
 to it. Always dropped: `.git/`, `.hg/`, `.svn/`, `node_modules/`, `venv/`,
 `.venv/`, `__pycache__/`, `*.pyc`, `.DS_Store` — and `dist/`, `build/`, `out/`,
 `.next/`, `.nuxt/`, `.svelte-kit/` **only when the tree root has a
@@ -298,84 +298,84 @@ not refused — do not put secrets in the tree.
 
 Two different things, and the CLI keeps them apart because the boundary is real:
 
-- **`lp job list|run|runs|logs|cancel`** — a job runs in a container of its own,
+- **`toft job list|run|runs|logs|cancel`** — a job runs in a container of its own,
   with its own memory limit and deadline, from the same release. Declare one in
-  `launchpad.toml`. `lp job run <name>` waits by default and the run's outcome
+  `toft.toml`. `toft job run <name>` waits by default and the run's outcome
   is the exit code — **`--json` included**, where a failed run prints the run
   document *and then* the refusal, two lines, exit 1; `--param k=v` repeats and
   is never parsed into a command. `--for 2026-10-06T03:00:00+01:00` names the
   instant the run is for (a date or date-time with no offset is UTC); the run
-  reads it as `LAUNCHPAD_SCHEDULED_FOR`. A job runs in a container where the
+  reads it as `TOFT_SCHEDULED_FOR`. A job runs in a container where the
   install has a cluster and on the install's own machine where it does not;
-  `lp job runs` says which, and the instant a run was for. `lp job list` prints
+  `toft job runs` says which, and the instant a run was for. `toft job list` prints
   each job's schedule with its zone and any `expect_within` alert window.
-  Where the install cannot run jobs for an app, `lp` says why as exit 2.
-- **`lp task list|create|edit|delete|run|runs|logs`** — a scheduled task is an
+  Where the install cannot run jobs for an app, `toft` says why as exit 2.
+- **`toft task list|create|edit|delete|run|runs|logs`** — a scheduled task is an
   HTTP request to a path your app published, in the app's own process.
-  `lp task run <name>` fires one now and waits as the job verb does, and a
+  `toft task run <name>` fires one now and waits as the job verb does, and a
   `skipped` firing is exit 1 — a firing that did not happen is not a success,
   under `--json` as well. It takes no parameters *here*: a task's parameters belong to
   its schedule, because a request to a published path has nowhere else to put
   them.
 
-  `lp task create <name> --schedule "0 9 * * *" --path /digest` is the whole of
+  `toft task create <name> --schedule "0 9 * * *" --path /digest` is the whole of
   it; add `--timezone Europe/London` to read the schedule in a zone rather than
   UTC (it then fires once per wall-clock time through daylight saving changes); `--schedule`, `--method`, `--overlap` and `--enabled` are optional.
   **Without a schedule the task is on demand** — nothing fires it until
-  `lp task run`, the Run button or the app asks for it — and `--schedule ""` on
-  an edit takes a schedule away without touching the task or its history. **`lp task edit`
+  `toft task run`, the Run button or the app asks for it — and `--schedule ""` on
+  an edit takes a schedule away without touching the task or its history. **`toft task edit`
   sends only the fields you name**, so naming one leaves the rest alone.
-  `lp task delete` asks first, because a task takes its run history with it —
+  `toft task delete` asks first, because a task takes its run history with it —
   pass `--yes` where nothing can answer.
 
 **The two are created in different places, and only one of them here.** A job is
-declared in `launchpad.toml` and exists once the release is built — and a
+declared in `toft.toml` and exists once the release is built — and a
 `schedule` on a job there makes it a *scheduled job*, still a container of its
-own, not a task. A task is a row on the app, and `lp task create` is the way to
+own, not a task. A task is a row on the app, and `toft task create` is the way to
 make one. A full personal key reaches these, a **deploy key does not** — shaping
 a task is configuration rather than shipping.
 
-**A `[tasks]` table in `launchpad.toml` does nothing.** Only `[jobs]` is read
+**A `[tasks]` table in `toft.toml` does nothing.** Only `[jobs]` is read
 there. An unrecognized table is ignored rather than refused, because the file is
-shared with `[app]` and `[static]` — but the deploy says so: a plain `lp deploy`
+shared with `[app]` and `[static]` — but the deploy says so: a plain `toft deploy`
 prints it, and `--json` carries a `warnings` array on the result object. You no
 longer have to read the build log to find out that something was ignored.
 
-## Files: `lp store`
+## Files: `toft store`
 
-`lp store ls|put|get|rm` moves files in and out of an app's durable store from
+`toft store ls|put|get|rm` moves files in and out of an app's durable store from
 outside the platform, for a person holding a grant. The transfer goes **direct
 to the object store**, so an unreachable bucket is exit 4 naming that host,
 while a refusal from the install is exit 3.
 
-**`ls` shows folders and takes one.** A bare `lp store ls` lists what you hold:
+**`ls` shows folders and takes one.** A bare `toft store ls` lists what you hold:
 a store granted outright by its name alone, and a store granted one folder of as
 `reports/2026-08/`. That is the same spelling `ls` takes as an argument, so the
 line one command prints is the line the next one takes.
 
 ```
-lp store ls                    # what you can reach, and at what level
-lp store ls reports            # one level: its folders, then its objects
-lp store ls reports/2026-08    # the level below
+toft store ls                    # what you can reach, and at what level
+toft store ls reports            # one level: its folders, then its objects
+toft store ls reports/2026-08    # the level below
 ```
 
 Listing a level prints folders before objects, which is what makes an object
-filed under a generated name reachable with `lp` alone — you do not have to know
+filed under a generated name reachable with `toft` alone — you do not have to know
 the name to find it. There is no recursive listing: a folder is a delimiter, and
 the store's extent is not something a client may address around.
 
-## The SDK before the deploy: `lp sdk vendor`
+## The SDK before the deploy: `toft sdk vendor`
 
 The app SDK is installed by the build, so a deployed app never needs this. What
 it is for is everything before the deploy — an editor that can see the package,
 and a local `go build`, `go vet` or CI run that does not fail on the import.
 
 ```
-lp sdk vendor                  # language detected from the tree
-lp sdk vendor --lang python
+toft sdk vendor                  # language detected from the tree
+toft sdk vendor --lang python
 ```
 
-It writes `.launchpad/sdk-<lang>/` from the install you are signed in to, so the
+It writes `.toft/sdk-<lang>/` from the install you are signed in to, so the
 bytes you compile against are the ones that install's build would have used, and
 it prints a **build id** for the copy it wrote — twelve hex characters derived
 from the SDK's own bytes rather than a declared version. The deploy log names
@@ -390,35 +390,35 @@ whichever one your package manager resolved.
 
 - **Go** also gets a `go.work` naming the vendored module. No require line is
   added to your `go.mod` — a workspace resolves the import without one. Both
-  paths ship with `lp deploy` and the platform then stands aside, because an app
+  paths ship with `toft deploy` and the platform then stands aside, because an app
   that brought its own SDK keeps it. **Ignore both in `.gitignore` or neither**:
   ignoring only `go.work` leaves a workspace on the platform naming a directory
   that did not ship, and the build fails there while working here.
-- **Python**: `uv pip install -e .launchpad/sdk-python`.
-- **Node**: `"@launchpad/sdk": "file:.launchpad/sdk-node"` in `package.json`.
-- **R**: `renv::install(".launchpad/sdk-r")`, or nothing at all — the build
-  installs `launchpad` into the release's library either way, and unlike Go
+- **Python**: `uv pip install -e .toft/sdk-python`.
+- **Node**: `"@larchway/toft": "file:.toft/sdk-node"` in `package.json`.
+- **R**: `renv::install(".toft/sdk-r")`, or nothing at all — the build
+  installs `toft` into the release's library either way, and unlike Go
   there is no compile step here to fail without it.
 
 Re-run it after the install is upgraded. Delete both paths to go back to the
 platform's own copy.
 
-## The escape hatch: `lp api`
+## The escape hatch: `toft api`
 
-`lp api <method> <path>` makes an authenticated call with the credential `lp`
+`toft api <method> <path>` makes an authenticated call with the credential `toft`
 already holds, and prints the install's own JSON on stdout.
 
 ```bash
-lp api GET /api/v1/apps
-lp api PATCH /api/v1/apps/$ID --data '{"visibility":"public"}'
-lp api POST /api/v1/apps/$ID/deployments --data @body.json
-cat body.json | lp api POST /api/v1/apps/$ID/cron --data @-
+toft api GET /api/v1/apps
+toft api PATCH /api/v1/apps/$ID --data '{"visibility":"public"}'
+toft api POST /api/v1/apps/$ID/deployments --data @body.json
+cat body.json | toft api POST /api/v1/apps/$ID/cron --data @-
 ```
 
 **Never read the credential out of the config file.** There is no command that
 prints it, and that is deliberate — its path and format are an implementation
 detail, they differ per platform, and a regex over them breaks silently the day
-the format changes. `lp api` is how you make the call without ever holding the
+the format changes. `toft api` is how you make the call without ever holding the
 key: it keeps the secret out of your shell variables, out of the process table,
 and out of whatever captured your output.
 
@@ -429,53 +429,53 @@ a 400 or a 422 included, where it understood the request and said no. Branch on
 the body for those; it is the platform's own JSON, and an exit code shared with
 every other command cannot tell "your request was wrong" from "the platform tried
 and failed". A path with no leading slash is read as
-relative to `/api/v1/`; one with a leading slash is sent as written, so `lp api
-GET apps` and `lp api GET /api/v1/apps` are the same call. A path that matches
+relative to `/api/v1/`; one with a leading slash is sent as written, so `toft api
+GET apps` and `toft api GET /api/v1/apps` are the same call. A path that matches
 no route on the install is exit **2** with `route_not_found` — a usage problem
 either way, whether the path was mistyped or the install is older than the verb.
 
 **On Windows, prefer the relative form.** Git Bash and every other MSYS shell
-rewrite an argument that starts with a slash into a Windows path *before* `lp`
-is started, so `lp api GET /api/v1/apps` arrives as `C:/Program
-Files/Git/api/v1/apps` and reaches no route. `lp` recognises the shape and says
-so, but the shell is what did it: use `lp api GET apps`, which is never
-rewritten, or set `MSYS_NO_PATHCONV=1`. The same applies to `--path` on `lp task
+rewrite an argument that starts with a slash into a Windows path *before* `toft`
+is started, so `toft api GET /api/v1/apps` arrives as `C:/Program
+Files/Git/api/v1/apps` and reaches no route. `toft` recognises the shape and says
+so, but the shell is what did it: use `toft api GET apps`, which is never
+rewritten, or set `MSYS_NO_PATHCONV=1`. The same applies to `--path` on `toft task
 create`.
 
-**Prefer a verb where one exists.** `lp api` validates nothing but your JSON: a
+**Prefer a verb where one exists.** `toft api` validates nothing but your JSON: a
 real verb checks the arguments, names the one you left out, reports failures in
-sentences, and keeps working when the route behind it changes. Reach for `lp
-api` for the rows below, not instead of `lp deploy`.
+sentences, and keeps working when the route behind it changes. Reach for `toft
+api` for the rows below, not instead of `toft deploy`.
 
-## What `lp` does not do
+## What `toft` does not do
 
 Be straight about this rather than inventing a flag. Everything here is reachable
-with `lp api`, which is the point of the column on the right:
+with `toft api`, which is the point of the column on the right:
 
 | | |
 |---|---|
 | Environment variables | Not in the CLI. Set them on the app's Settings page, or `PATCH /api/v1/apps/{id}` with `env_vars`. A restart applies them; a redeploy is not required |
 | Making an app public | Not in the CLI. `visibility` on the same PATCH, or the Settings page. A newly created app is private, so an *anonymous* fetch of its URL answers `authentication required` — that is the app working, not a broken deploy, and your own key fetches it (see Looking at the app) |
 | Deleting an app | Not in the CLI |
-| Creating, editing or deleting a scheduled task | `lp task create\|edit\|delete`, with a full personal key |
+| Creating, editing or deleting a scheduled task | `toft task create\|edit\|delete`, with a full personal key |
 | A notebook's re-render schedule | Not in the CLI, and not a scheduled task — it produces a new rendered release rather than calling a path. The Automation tab, or `PUT`/`DELETE /api/v1/apps/{id}/render-schedule` |
 | An app's tags | Not in the CLI. `PUT /api/v1/apps/{id}/tags` with the ids of tags that already exist; creating the tags themselves is an administrator's |
 | Pruning old releases | Not in the CLI. `DELETE /api/v1/apps/{id}/deployments` drops every release but the serving one, and `DELETE .../deployments/{deployID}` drops one. A pruned release is no longer a rollback target |
 | Grants, storage mappings, integrations | Administrator surfaces, in the UI or the API |
-| Publishing from RStudio | Not `lp`'s: RStudio's *Add account* takes the install's address as a Posit Connect server, signs in through the same approval page as `lp login`, and publishes with rsconnect. Its routes are under `/__api__`; an agent deploys with `lp` |
+| Publishing from RStudio | Not `toft`'s: RStudio's *Add account* takes the install's address as a Posit Connect server, signs in through the same approval page as `toft login`, and publishes with rsconnect. Its routes are under `/__api__`; an agent deploys with `toft` |
 
 ## When something refuses
 
 | What you see | What it is |
 |---|---|
-| `no app is linked in this directory` | run `lp link <slug>`, or pass `--app` |
+| `no app is linked in this directory` | run `toft link <slug>`, or pass `--app` |
 | `that key has expired` (exit 3) | mint another; nothing client-side decides this, the install said it |
 | `that key can read and not write` (exit 3, `key_read_scope`) | the key was minted read-only in the browser. A scope cannot be widened — ask for a full key. Retrying, or reading first to "warm it up", changes nothing |
 | `forbidden` (exit 3, `deny_system_role`) | the account is a **viewer** on this install and publishing needs the publisher role. The install says only "forbidden" — this code is the whole diagnosis. An administrator changes a system role; there is no flag, no other command and no retry that reaches it. A **personal** key can lodge the ask — an empty `POST /api/v1/me/promotion-requests`, which notifies the administrators and answers 409 if one is already pending — and then say who has to act. A deploy key cannot, and neither can a service account |
 | a licence limit (exit 3) | a limit on the install, not a permission problem, and nothing already deployed has stopped |
-| the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `lp deps` has the packages |
+| the deploy failed during `scan` | the dependency gate, or the archive's caps. `reason` says which, and `toft deps` has the packages |
 | an app that is locked (exit 2) | an administrator, or the install's own dependency policy, has locked it. **Nothing was built**, and retrying will refuse identically until the lock is lifted |
-| a task or job name that does not resolve (exit 2) | a name, not a run — the platform attempted nothing. `lp task list` and `lp job list` name what exists. This is exit **2**, never 1: exit 1 would mean the work ran and failed |
+| a task or job name that does not resolve (exit 2) | a name, not a run — the platform attempted nothing. `toft task list` and `toft job list` name what exists. This is exit **2**, never 1: exit 1 would mean the work ran and failed |
 | `background jobs are not available` (exit 2) | this install cannot run jobs for this app, and the message says why. Configuration, not a bug in the job |
 | `authentication required` from the app's URL | the app is private and the request carried no credential — send your key, per Looking at the app |
 

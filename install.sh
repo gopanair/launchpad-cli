@@ -1,7 +1,7 @@
 #!/bin/sh
-# lp — the Launchpad command-line client.
+# toft — the Toft command-line client.
 #
-#   curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh
 #
 # Downloads one binary for this machine, checks it against the published
 # SHA256SUMS, and puts it somewhere on PATH. Nothing else — no daemon, no
@@ -30,8 +30,8 @@ set -eu
 # sits beside it. Typing a version here by hand is how those two come apart.
 
 VERSION_DEFAULT=0.6.6
-REPO_DEFAULT=gopanair/launchpad-cli
-BINARY=lp
+REPO_DEFAULT=larchway-labs/toft-cli
+BINARY=toft
 
 VERSION=$VERSION_DEFAULT
 REPO=$REPO_DEFAULT
@@ -40,9 +40,9 @@ QUIET=0
 
 usage() {
     cat <<'EOF'
-lp — the Launchpad command-line client.
+toft — the Toft command-line client.
 
-  curl -fsSL https://raw.githubusercontent.com/gopanair/launchpad-cli/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/larchway-labs/toft-cli/main/install.sh | sh
 
 Options:
   --dir DIR         install into DIR instead of the default. The default is
@@ -112,7 +112,7 @@ parse_args() {
 
 # --- This machine ------------------------------------------------------------
 #
-# The asset names are the Go pair, lp_<goos>_<goarch>, because that is what the
+# The asset names are the Go pair, toft_<goos>_<goarch>, because that is what the
 # build matrix produces and a translation table between two spellings of the
 # same platforms is a thing to get wrong twice.
 #
@@ -127,7 +127,7 @@ detect_platform() {
     Linux) OS=linux ;;
     Darwin) OS=darwin ;;
     MINGW* | MSYS* | CYGWIN* | Windows_NT)
-        die "this script is for Linux and macOS. On Windows, download lp_windows_amd64.exe from https://github.com/$REPO/releases and rename it lp.exe"
+        die "this script is for Linux and macOS. On Windows, download toft_windows_amd64.exe from https://github.com/$REPO/releases and rename it toft.exe"
         ;;
     *) die "unsupported operating system: $(uname -s)" ;;
     esac
@@ -207,7 +207,7 @@ sha256_of() {
 
 # The checksum is not there to defend against GitHub. It is there because a
 # proxy, a captive portal or a truncated transfer produces a file that is the
-# right length often enough, and "lp: cannot execute binary file" is a terrible
+# right length often enough, and "toft: cannot execute binary file" is a terrible
 # way to learn that.
 verify() {
     # $1 the downloaded binary, $2 the SHA256SUMS file
@@ -225,7 +225,7 @@ verify() {
 install_binary() {
     base=$(release_base)
 
-    tmp=$(mktemp -d 2>/dev/null || mktemp -d -t lp) || die "cannot create a temporary directory"
+    tmp=$(mktemp -d 2>/dev/null || mktemp -d -t toft) || die "cannot create a temporary directory"
     trap 'rm -rf "$tmp"' EXIT INT TERM
 
     say "downloading $ASSET"
@@ -269,12 +269,12 @@ summary() {
 
   Point it at your install and sign in:
 
-      ${C_BOLD}lp login https://launchpad.your-company.com${C_RESET}
+      ${C_BOLD}toft login https://toft.your-company.com${C_RESET}
 
   then, from a project directory:
 
-      ${C_BOLD}lp link <app>${C_RESET}      ${C_DIM}name the app this directory deploys to${C_RESET}
-      ${C_BOLD}lp deploy${C_RESET}          ${C_DIM}push what is on your disk${C_RESET}
+      ${C_BOLD}toft link <app>${C_RESET}      ${C_DIM}name the app this directory deploys to${C_RESET}
+      ${C_BOLD}toft deploy${C_RESET}          ${C_DIM}push what is on your disk${C_RESET}
 
 EOF
 }

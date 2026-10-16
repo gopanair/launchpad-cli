@@ -1,11 +1,11 @@
 ---
-name: launchpad-sdk
-description: Write an app that runs on Launchpad — what the platform sets in its environment, how it is detected and built, what `launchpad.toml` declares, and the Launchpad app SDK for Python, Node, Go and R (`lp.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Launchpad, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
+name: toft-sdk
+description: Write an app that runs on Toft — what the platform sets in its environment, how it is detected and built, what `toft.toml` declares, and the Toft app SDK for Python, Node, Go and R (`toft.app.can`, scratch and storage, the app's JSON document, Slack and email, background jobs, who the viewer is, a scheduled task's log). Load it when writing or fixing code that will be deployed to Toft, when an app works locally and misbehaves once deployed, or when an app needs to send a notification, store a file, or start background work.
 ---
 
-# Writing an app for Launchpad
+# Writing an app for Toft
 
-An app is ordinary code. Launchpad clones or receives it, works out what it is,
+An app is ordinary code. Toft clones or receives it, works out what it is,
 installs its dependencies, starts it, and puts it behind a URL. There is nothing
 to import to be deployable — the SDK below is for the things only the platform
 can do.
@@ -94,9 +94,9 @@ chunk prints is published to everyone who can read the page.
 **A document app can still run jobs, and that surprises people.** No process
 behind the page does not mean no process at all: a job is a separate container
 running a command from the same release, and a document's release carries its
-venv or its R library like any other. So `[jobs]` in `launchpad.toml` works on an
+venv or its R library like any other. So `[jobs]` in `toft.toml` works on an
 `.Rmd`, a `.qmd` and an `.ipynb`, and inside that job the SDK is fully present —
-`lp.run` is populated, `lp.mounts()` answers, and the job may write to storage.
+`toft.run` is populated, `toft.mounts()` answers, and the job may write to storage.
 It is the one way a document app does anything after its build. What it cannot do
 is see a request: no viewer identity, no task the app can observe, because
 nothing here serves a request — the platform serves the rendered file.
@@ -105,7 +105,7 @@ nothing here serves a request — the platform serves the rendered file.
 tree is refused before anything is built, with `manifest_invalid` and the reason:
 a folder of files has no runtime to run a command in.
 
-## `launchpad.toml`
+## `toft.toml`
 
 Optional, committed, and the better door for anything it can say. Unknown
 top-level tables are ignored, so it is safe to share with the CLI's `[app]` and
@@ -116,11 +116,11 @@ read.** Only `[jobs]` is read here — a `[tasks]` table declares no schedule, a
 a misspelled key inside a job is a limit that stayed at its default. Neither
 fails the deploy, so **check the build log rather than reading a green deploy as
 proof the thing you declared exists**. Scheduled tasks are made with
-`lp task create`, not from this file.
+`toft task create`, not from this file.
 
 ```toml
 [app]
-slug = "reports"              # written by `lp link`
+slug = "reports"              # written by `toft link`
 
 [static]
 root     = "dist"             # document root
@@ -150,9 +150,9 @@ command back with it.
 project file): the deploy installs dependencies, starts nothing, and the app's
 work is its `[jobs]`. Restart and Stop answer `no_service` on one.
 
-**A job can send.** `lp.notify(...)` (email, Slack, any integration an
+**A job can send.** `toft.notify(...)` (email, Slack, any integration an
 administrator attached to the app) works inside a job, with the run's own
-credential; everything else on the app surface — `lp.data`, `lp.who`, starting
+credential; everything else on the app surface — `toft.data`, `toft.who`, starting
 another job — is refused from a job with `job_send_only`. Static apps may not declare jobs — there is no runtime in
 which a command would mean anything — but scheduled tasks are fine, since those
 are HTTP requests to a path you published.
@@ -164,19 +164,19 @@ registry fetch and nothing to add to `requirements.txt` or `package.json`; if
 you declare your own copy, yours is kept.
 
 ```python
-import launchpad as lp        # Python
+import toft        # Python
 ```
 
 ```js
-import lp from "@launchpad/sdk";   // Node — ESM. From CommonJS: await import(...)
+import toft from "@larchway/toft";   // Node — ESM. From CommonJS: await import(...)
 ```
 
 ```go
-import lp "launchpad/lp"     // Go — no require line; the build's go.work resolves it
+import "toft"     // Go — no require line; the build's go.work resolves it
 ```
 
 ```r
-library(launchpad)           # R — installed into the release's renv library
+library(toft)           # R — installed into the release's renv library
                              # store_put(store("drop"), "report.parquet") to write;
                              # file.copy() to a store writes a zero-byte object
 ```
@@ -186,25 +186,25 @@ error, naming the environment variable that is missing. **There is deliberately
 no dry-run mode**: an SDK that printed to a console instead of paging a channel
 would be a trap that only springs in production.
 
-**Before the deploy, `lp sdk vendor` puts it on your disk.** The SDK is installed
+**Before the deploy, `toft sdk vendor` puts it on your disk.** The SDK is installed
 by the build, so a deployed app never needs this — but until the platform has
 built the app, your own tooling cannot see the package at all. In Python and Node
 that is a nuisance (the import raises); in Go it is a stop, because nothing
-resolves `launchpad/lp` and `go build`, `go vet` and your CI all fail on the
+resolves `toft` and `go build`, `go vet` and your CI all fail on the
 import line.
 
 ```
-lp sdk vendor                  # language detected from the tree
+toft sdk vendor                  # language detected from the tree
 ```
 
-It writes `.launchpad/sdk-<lang>/` from the install you are signed in to, so you
+It writes `.toft/sdk-<lang>/` from the install you are signed in to, so you
 compile against the copy that install's build would have used. Nothing is
 published to a registry in any language, deliberately: a published package would
 be a second version, and you would be building against whichever your package
 manager resolved rather than against the install you deploy to.
 
 Go also gets a `go.work` naming it — **no require line is added to your
-`go.mod`**. Both paths ship with `lp deploy` and the platform then stands aside,
+`go.mod`**. Both paths ship with `toft deploy` and the platform then stands aside,
 because an app that brought its own SDK keeps it; ignore both in `.gitignore` or
 neither, since ignoring only `go.work` leaves a workspace on the platform naming
 a directory that did not ship. Python and Node need one install line, which the
@@ -214,19 +214,19 @@ command prints.
 
 | | |
 |---|---|
-| **A context on everything that touches the network** | `lp.App.Can(ctx, "email")`, `lp.Notify.Slack(ctx, text)`, `lp.Jobs.Start(ctx, ...)`. Your handler already has one, and an SDK call should not be the thing in it that cannot be cancelled |
-| **Errors, not exceptions** | `*lp.Error` carries the status, the platform's own words and the decoded body. `errors.As` reaches `*lp.QueueFullError` (`InFlight`, `Limit`) and `*lp.VersionConflictError` (`Version`) |
-| **Options are structs** | `lp.EmailMessage{To: …, Subject: …, Text: …}`, `lp.StartOptions{Params: …}`, `lp.SlackFileOptions{Title: …}` — Go has no keyword arguments |
-| **`lp.ViewerFor(r.Header)` / `lp.Who(ctx, r.Header)`** | the first errors when there is nobody to act for; the second answers `nil, nil`, because an anonymous visitor is an answer |
-| **`lp.TaskFor(r.Header)` may be nil, and a nil one still logs** | `task.Log(ctx, …)` on a nil `*lp.Task` does nothing and says so, so an endpoint serving both a schedule and a person needs no branch |
-| **`lp.CurrentRun()`** | the job's view of itself, `nil` everywhere else |
-| **Numbers come back as `float64`** | anything read out of `lp.Data`'s map has been through JSON. Unmarshal `Document.Data` into a struct of your own when you want your types back |
+| **A context on everything that touches the network** | `toft.App.Can(ctx, "email")`, `toft.Notify.Slack(ctx, text)`, `toft.Jobs.Start(ctx, ...)`. Your handler already has one, and an SDK call should not be the thing in it that cannot be cancelled |
+| **Errors, not exceptions** | `*toft.Error` carries the status, the platform's own words and the decoded body. `errors.As` reaches `*toft.QueueFullError` (`InFlight`, `Limit`) and `*toft.VersionConflictError` (`Version`) |
+| **Options are structs** | `toft.EmailMessage{To: …, Subject: …, Text: …}`, `toft.StartOptions{Params: …}`, `toft.SlackFileOptions{Title: …}` — Go has no keyword arguments |
+| **`toft.ViewerFor(r.Header)` / `toft.Who(ctx, r.Header)`** | the first errors when there is nobody to act for; the second answers `nil, nil`, because an anonymous visitor is an answer |
+| **`toft.TaskFor(r.Header)` may be nil, and a nil one still logs** | `task.Log(ctx, …)` on a nil `*toft.Task` does nothing and says so, so an endpoint serving both a schedule and a person needs no branch |
+| **`toft.CurrentRun()`** | the job's view of itself, `nil` everywhere else |
+| **Numbers come back as `float64`** | anything read out of `toft.Data`'s map has been through JSON. Unmarshal `Document.Data` into a struct of your own when you want your types back |
 
 ### What this app is, and what it may do
 
 ```python
-lp.app.id, lp.app.slug, lp.app.mode, lp.app.base_path
-lp.app.can("email")            # cheap and cached
+toft.app.id, toft.app.slug, toft.app.mode, toft.app.base_path
+toft.app.can("email")            # cheap and cached
 ```
 
 `mode` is **this workload's** mode, taken from the deployment that started it —
@@ -234,11 +234,11 @@ not the app's configured setting — so it is right on the first request rather
 than after the next restart.
 
 ```js
-await lp.app.slug();  await lp.app.basePath();  await lp.app.can("slack");
+await toft.app.slug();  await toft.app.basePath();  await toft.app.can("slack");
 ```
 
 **In Node these are async methods, and forgetting that does not fail.**
-`lp.app.id` without the call and the `await` is a Promise, and a template that
+`toft.app.id` without the call and the `await` is a Promise, and a template that
 interpolates one renders `[object Promise]` — a page that looks deployed and is
 wrong, on the fact an app is most likely to put in its own header. Python
 exposes the same values as plain properties, so the shapes differ by language
@@ -259,11 +259,11 @@ for this app" on a screen instead of leaving it to be found at 2am in a log.
 
 | | |
 |---|---|
-| `lp.scratch_dir("uploads")` / `lp.scratchDir` / `lp.ScratchDir` | ephemeral, per app, **wiped on every start, restart and redeploy** |
-| `lp.session_scratch_dir(id)` / `lp.sessionScratchDir` / `lp.SessionScratchDir` | one browser session's corner of it. The id is hashed, so a traversing value cannot escape; an empty one is refused |
-| `lp.storage("reports").path` / `lp.Storage(…).Path` | a durable volume an administrator mapped to this app, resolved by name |
-| `lp.store("reports").put(path)` / `lp.Store(…).Put(path, name)` | a file into an object store |
-| `lp.mounts()` / `lp.Mounts()` | everything mapped, with `read_only` / `ReadOnly()` |
+| `toft.scratch_dir("uploads")` / `toft.scratchDir` / `toft.ScratchDir` | ephemeral, per app, **wiped on every start, restart and redeploy** |
+| `toft.session_scratch_dir(id)` / `toft.sessionScratchDir` / `toft.SessionScratchDir` | one browser session's corner of it. The id is hashed, so a traversing value cannot escape; an empty one is refused |
+| `toft.storage("reports").path` / `toft.Storage(…).Path` | a durable volume an administrator mapped to this app, resolved by name |
+| `toft.store("reports").put(path)` / `toft.Store(…).Put(path, name)` | a file into an object store |
+| `toft.mounts()` / `toft.Mounts()` | everything mapped, with `read_only` / `ReadOnly()` |
 
 **One name can be two mounts.** A mapping's identity is
 `(resource, app, folder)`, so an administrator can attach one resource twice —
@@ -271,13 +271,13 @@ the root read-only and a folder at `write`, at two paths in one workload. Both
 arrive under the same name, and the folder is what tells them apart:
 
 ```python
-lp.storage("drop", folder="backup").path     # lp.store(name, folder=…) likewise
+toft.storage("drop", folder="backup").path     # toft.store(name, folder=…) likewise
 ```
 ```js
-lp.storage("drop", { folder: "backup" });
+toft.storage("drop", { folder: "backup" });
 ```
 ```go
-lp.StorageIn("drop", "backup")               // Go has no keyword arguments
+toft.StorageIn("drop", "backup")               // Go has no keyword arguments
 ```
 ```r
 storage("drop", "backup")
@@ -295,9 +295,9 @@ are two questions with two answers, and `mounts()` is how you ask the second.
 ### The app's one document
 
 ```python
-lp.data.get()                                   # dict, or None if never written
-lp.data.set({"period": period})
-lp.data.update(lambda s: s.update(runs=s.get("runs", 0) + 1))   # against a second writer
+toft.data.get()                                   # dict, or None if never written
+toft.data.set({"period": period})
+toft.data.update(lambda s: s.update(runs=s.get("runs", 0) + 1))   # against a second writer
 ```
 
 Both writes hand back the document they wrote — `doc.data` is what you saved,
@@ -310,10 +310,10 @@ apart. It is a place for a little state, not a database.
 ### Telling someone
 
 ```python
-lp.notify.slack("Ingest finished: 1,204 rows")
-lp.notify.slack_file("/tmp/recon.xlsx", title="Weekly reconciliation")
-lp.notify.email(to=["finance@example.com"], subject="Weekly report", text=body)
-send = lp.notify.status(send)
+toft.notify.slack("Ingest finished: 1,204 rows")
+toft.notify.slack_file("/tmp/recon.xlsx", title="Weekly reconciliation")
+toft.notify.email(to=["finance@example.com"], subject="Weekly report", text=body)
+send = toft.notify.status(send)
 ```
 
 Nothing here blocks on delivery: a send returns once the platform has accepted
@@ -323,7 +323,7 @@ on. A send never fails the request that triggered it.
 ### Background work
 
 ```python
-run = lp.jobs.start("reconcile", params={"month": "2026-03"})   # as the app
+run = toft.jobs.start("reconcile", params={"month": "2026-03"})   # as the app
 run = run.wait(timeout=600)
 run.succeeded, run.output(), run.logs()
 ```
@@ -331,19 +331,19 @@ run.succeeded, run.output(), run.logs()
 A job is a different entrypoint of *this same app*, from the same release, in a
 container with its own memory limit and deadline. It never blocks on the work.
 
-Inside the job, `lp.run.scheduled_for` (Node `run.scheduledFor`, Go
+Inside the job, `toft.run.scheduled_for` (Node `run.scheduledFor`, Go
 `run.ScheduledFor()`, R `scheduled_for()`) is **the instant this run is for**:
 the schedule tick it fired for, in the schedule's zone, even when it started
-late — or the time somebody named with `lp job run --for`. It is `None` when
+late — or the time somebody named with `toft job run --for`. It is `None` when
 nobody gave one, never *now*, so a re-run of Tuesday's work processes Tuesday.
 
-**Two objects, and which one you call is the decision.** `lp.jobs` is the app
-acting as itself. `lp.viewer(request.headers).jobs` is the app acting for the
+**Two objects, and which one you call is the decision.** `toft.jobs` is the app
+acting as itself. `toft.viewer(request.headers).jobs` is the app acting for the
 person looking at the page — attribution that would otherwise be lost by
 omission. `viewer(...)` raises when there is nobody to act for.
 
 ```python
-me = lp.who(request.headers)          # Identity, or None for an anonymous visitor
+me = toft.who(request.headers)          # Identity, or None for an anonymous visitor
 if me and (me.role == "owner" or me.is_admin):
     render_admin_tab()
 if me and "finance" in me.group_names:
@@ -355,7 +355,7 @@ answer. It raises for one thing only: an app an administrator has not switched
 viewer identity on for.
 
 `role` is `owner`/`editor`/`viewer` and answers *what may this person do to this
-deployment in Launchpad* — not what they may do in your domain. A rule about
+deployment in Toft* — not what they may do in your domain. A rule about
 invoices belongs on `groups`. `is_admin` is separate on purpose: an
 administrator has effective ownership of every app, so `role == "owner"` alone
 would grant a destructive action to every administrator on the install. `email`
@@ -364,8 +364,8 @@ is `None` on a public app.
 ### Inside a job, inside a task
 
 ```python
-lp.run                                # the job's view of itself; None elsewhere
-task = lp.task(request.headers)       # a firing; None on an ordinary visit
+toft.run                                # the job's view of itself; None elsewhere
+task = toft.task(request.headers)       # a firing; None on an ordinary visit
 if task:
     task.log(f"read 1,204 rows for {task.name}")
 ```
@@ -390,9 +390,9 @@ exist. Worth adding to anything that might outlive the timeout: a run that never
 answers is recorded as a failure with nothing else in it.
 
 **A task's schedule is optional, and your handler cannot tell.** A task created
-with no cron expression is fired only when somebody asks — `lp task run`, the
+with no cron expression is fired only when somebody asks — `toft task run`, the
 Run now button, or your own app — and it travels the same firing path a schedule
-does, so `X-Launchpad-Cron: 1` is set either way and `lp.task(headers)` answers
+does, so `X-Toft-Cron: 1` is set either way and `toft.task(headers)` answers
 identically. Reading it means *this was a firing*, never *a schedule came
 round*.
 
@@ -403,8 +403,8 @@ expression.
 
 ## Once it is deployed
 
-`lp logs` is what your app printed, `lp events` is what the platform noticed,
-and `lp status` says what is serving — `--json` carries the app's URL, which is
+`toft logs` is what your app printed, `toft events` is what the platform noticed,
+and `toft status` says what is serving — `--json` carries the app's URL, which is
 the install's own answer and so is right whether or not deployed apps get an
 origin of their own there.
 
@@ -412,7 +412,7 @@ A newly created app is private — an *anonymous* request to its URL answering
 `authentication required` is the app working, not a failed deploy. You can still
 look at it: the apps gateway takes your own key as a bearer credential and
 authorizes you exactly as it would in a browser, so `curl -H "Authorization:
-Bearer $LAUNCHPAD_TOKEN"` and a headless browser sending the same header both
-reach an app nobody has made public. The `launchpad-cli` skill has the whole
+Bearer $TOFT_TOKEN"` and a headless browser sending the same header both
+reach an app nobody has made public. The `toft-cli` skill has the whole
 recipe, the browser half included. Your app never sees that header: the gateway
 consumes it.
